@@ -1,0 +1,266 @@
+---
+// "Mind map your project": a patch of the real canvas, as the app draws it (frosted bar on top, minimap bottom left,
+// mic bottom middle, dotted board, fixed-size cards). A sonar dot invites a double-click (double-tap on touch).
+// The card appears where you click, unfolds into the open card over a dimmed canvas (as in the app: a flight to the
+// middle, then the unfold), its description types in, "Start agent" is pressed, and it folds back into its place, working.
+---
+<div class="mm" id="mm" role="application" aria-label="Interactive demo: double-click the canvas to create a task card">
+  <div class="mm-chrome" aria-hidden="true">
+    <div class="mm-bar">
+      <img src="/img/logo.svg" alt="" width="26" height="26" />
+      <span class="mm-pill"><b>Tipjar</b> <i>main</i></span>
+      <span class="mm-pill hide-s">Archive</span>
+      <span class="mm-pill hide-s">Queue <em>1</em></span>
+      <span class="mm-pill">+ New task</span>
+      <span class="mm-right"><span class="mm-pill hide-s">Configuration</span></span>
+    </div>
+    <div class="mm-map" id="mm-map"></div>
+    <div class="mm-mic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+  </div>
+
+  <div class="mm-card static a hide-s" style="--c:var(--green)"><span class="kind">Task</span><b class="ttl">Round to whole dollars</b><p class="meta">A switch rounds each share up to the dollar.</p><span class="state">Approved</span></div>
+  <div class="mm-card static b hide-s" style="--c:var(--blue)"><span class="kind">Task</span><b class="ttl">Run the tests on every push</b><p class="meta">Writing the workflow.</p><span class="state working">Agent at work<i class="stroke"></i></span></div>
+
+  <div class="mm-hint" id="mm-hint">
+    <span class="sonar"><i></i><i></i><i></i></span>
+    <span class="mm-label"><span class="pc">Double-click</span><span class="touch">Double-tap</span> to create a task</span>
+  </div>
+
+  <div class="mm-dim" id="mm-dim"></div>
+  <div class="mm-panel" id="mm-panel" aria-hidden="true">
+    <div class="inner">
+      <button class="close" id="mm-close" type="button" aria-label="Close">×</button>
+      <div class="p-kind">Task</div>
+      <div class="p-title" id="mm-ptitle"><span class="ph">What is it about?</span></div>
+      <div class="p-state"><span class="dotm">●</span> New</div>
+      <div class="p-body" id="mm-pbody"><span class="ph">Description</span><span class="caret"></span></div>
+      <div class="p-foot">
+        <button class="btn primary" id="mm-start" type="button">Start agent<span class="sonar mini" aria-hidden="true"><i></i><i></i><i></i></span></button>
+        <span class="hint">An agent starts on a branch of its own and shows a demo at the end.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = (id: string) => document.getElementById(id)!;
+  const area = $('mm'), hint = $('mm-hint'), dim = $('mm-dim'), panel = $('mm-panel'), pbody = $('mm-pbody'),
+    ptitle = $('mm-ptitle'), start = $('mm-start'), map = $('mm-map');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const UNFOLD = 300;
+
+  const tasks = [
+    { t: 'Add dark mode', d: 'Follow the system setting, with a toggle in the top bar.' },
+    { t: 'Fix the login redirect', d: 'After signing in, return to the page the user came from.' },
+    { t: 'Export the board as PDF', d: 'One page per canvas, cards in their arranged positions.' },
+    { t: 'Speed up search', d: 'Index card titles on write instead of scanning on read.' },
+    { t: 'Onboarding checklist', d: 'Three steps on first launch, dismissible and remembered.' },
+  ];
+  let n = 0, busy = false, hurry = false, closeReq = false;
+  let decide: ((v: 'start' | 'close') => void) | null = null;
+  const cards: HTMLElement[] = [];
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, hurry ? 0 : reduce ? Math.min(ms, 150) : ms));
+  const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
+
+  const rectOf = (el: HTMLElement) => ({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight });
+  const setRect = (r: { left: number; top: number; width: number; height: number }) => {
+    panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px'; panel.style.width = r.width + 'px'; panel.style.height = r.height + 'px';
+  };
+  const openRect = () => {
+    const W = area.clientWidth, H = area.clientHeight, w = Math.min(600, W - 24), h = Math.min(380, H - 100);
+    return { left: (W - w) / 2, top: Math.max(66, (H - h) / 2 + 24), width: w, height: h };
+  };
+
+  function drawMap() {
+    map.innerHTML = '';
+    const W = area.clientWidth, H = area.clientHeight;
+    for (const c of area.querySelectorAll<HTMLElement>('.mm-card:not(.gone)')) {
+      const s = document.createElement('i');
+      s.style.cssText = `left:${(c.offsetLeft / W) * 100}%;top:${(c.offsetTop / H) * 100}%;width:${(c.offsetWidth / W) * 100}%;height:${(c.offsetHeight / H) * 100}%;background:${c.classList.contains('working') ? 'var(--blue)' : c.classList.contains('static') ? (c.style.getPropertyValue('--c') || 'var(--muted)') : 'var(--muted)'}`;
+      map.appendChild(s);
+    }
+  }
+
+  async function create(clientX: number, clientY: number) {
+    if (busy) return;
+    busy = true; hurry = false; closeReq = false;
+    const task = tasks[n++ % tasks.length];
+    const r = area.getBoundingClientRect();
+    hint.classList.add('done');
+
+    // the card, where it was made (cards have one fixed size; the bar and the foot stay clear)
+    const el = document.createElement('div');
+    el.className = 'mm-card fresh';
+    el.style.setProperty('--c', 'var(--muted)');
+    el.innerHTML = '<span class="kind">Task</span><b class="ttl untitled">New task</b><p class="meta"></p><span class="state">Planned</span>';
+    area.appendChild(el);
+    const w = el.offsetWidth, h = el.offsetHeight;
+    el.style.left = Math.max(12, Math.min(clientX - r.left - w / 2, area.clientWidth - w - 12)) + 'px';
+    el.style.top = Math.max(70, Math.min(clientY - r.top - h / 2, area.clientHeight - h - 12)) + 'px';
+    cards.push(el);
+    if (cards.length > 5) { const old = cards.shift()!; old.classList.add('gone'); setTimeout(() => { old.remove(); drawMap(); }, 300); }
+    drawMap();
+    const ttl = el.querySelector<HTMLElement>('.ttl')!, meta = el.querySelector<HTMLElement>('.meta')!, state = el.querySelector<HTMLElement>('.state')!;
+    await sleep(380);
+
+    // unfold: from the card's rect to the open card's, over the dimmed canvas
+    ptitle.innerHTML = '<span class="ph">What is it about?</span>';
+    pbody.innerHTML = '<span class="ph">Description</span><span class="caret"></span>';
+    start.classList.remove('pressed', 'beckon');
+    panel.classList.remove('ready', 'anim');
+    setRect(rectOf(el));
+    panel.style.setProperty('--c', 'var(--muted)');
+    panel.classList.add('on'); panel.setAttribute('aria-hidden', 'false');
+    await frame(); await frame();
+    dim.classList.add('on');
+    el.style.visibility = 'hidden';
+    panel.classList.add('anim');
+    setRect(openRect());
+    await sleep(UNFOLD);
+    panel.classList.add('ready');
+
+    // the description types itself in, the cursor in the field
+    await sleep(250);
+    pbody.innerHTML = '<span class="txt"></span><span class="caret"></span>';
+    const txt = pbody.querySelector<HTMLElement>('.txt')!;
+    if (hurry || reduce) txt.textContent = task.d;
+    else for (let i = 1; i <= task.d.length && !hurry; i++) { txt.textContent = task.d.slice(0, i); await sleep(16); }
+    txt.textContent = task.d;
+    await sleep(550);
+
+    // the user starts it: "Start agent" waits for a click, a sonar on it asking for one.
+    // Closing instead (×, the dim, Esc) folds the card back as it is, planned.
+    hurry = false;
+    let choice: 'start' | 'close' = 'close';
+    if (!closeReq) {
+      start.classList.add('beckon');
+      choice = await new Promise<'start' | 'close'>((res) => { decide = res; });
+      start.classList.remove('beckon');
+    }
+    decide = null;
+    if (choice === 'start') { start.classList.add('pressed'); await sleep(220); }
+    el.style.visibility = '';
+    panel.classList.remove('ready');
+    dim.classList.remove('on');
+    setRect(rectOf(el));
+    await sleep(UNFOLD);
+    panel.classList.remove('on', 'anim'); panel.setAttribute('aria-hidden', 'true');
+    meta.textContent = task.d;
+    el.classList.remove('fresh');
+    if (choice === 'start') {
+      ttl.textContent = task.t; ttl.classList.remove('untitled');
+      el.classList.add('working');
+      el.style.setProperty('--c', 'var(--blue)');
+      state.className = 'state working'; state.innerHTML = 'Agent at work<i class="stroke"></i>';
+    }
+    drawMap();
+    busy = false;
+  }
+
+  const inCanvas = (t: EventTarget | null) => !(t as HTMLElement).closest('.mm-chrome, .mm-card, .mm-panel, .mm-dim');
+  area.addEventListener('dblclick', (e) => { if (inCanvas(e.target)) create(e.clientX, e.clientY); });
+  // touch screens: two quick taps close together (dblclick is unreliable there)
+  let last = { t: 0, x: 0, y: 0 };
+  area.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'touch' || !inCanvas(e.target)) return;
+    const quick = e.timeStamp - last.t < 400 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 30;
+    last = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+    if (quick) { last.t = 0; create(e.clientX, e.clientY); }
+  });
+  // closing early (dim, ×, Esc) skips the typing and folds the card back
+  const hurryUp = () => { if (!busy) return; hurry = true; closeReq = true; decide?.('close'); };
+  start.addEventListener('click', () => { if (decide) decide('start'); });
+  dim.addEventListener('click', hurryUp);
+  $('mm-close').addEventListener('click', hurryUp);
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') hurryUp(); });
+  addEventListener('resize', drawMap);
+  drawMap();
+</script>
+
+<style is:global>
+  .mm { position: relative; height: 540px; border-radius: 16px; overflow: hidden; touch-action: manipulation; user-select: none; cursor: crosshair;
+    border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow);
+    background-color: color-mix(in srgb, var(--bg) 60%, transparent);
+    background-image: radial-gradient(var(--dot) 1.2px, transparent 1.4px); background-size: 22px 22px; }
+
+  /* the app's chrome, drawn small: frosted bar, minimap, microphone */
+  .mm-chrome { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .mm-bar { position: absolute; left: 0; right: 0; top: 0; height: 54px; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    background: color-mix(in srgb, var(--bg) 45%, transparent); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6); }
+  .mm-bar img { margin-right: 4px; }
+  .mm-right { margin-left: auto; display: flex; gap: 8px; }
+  .mm-pill { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 13px; border-radius: 999px; font-size: 13px; white-space: nowrap;
+    background: var(--card); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow); }
+  .mm-pill i { font-style: normal; color: var(--muted); font-size: 12px; }
+  .mm-pill em { font-style: normal; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 4px; background: var(--chip); color: var(--muted); }
+  .mm-map { position: absolute; left: 12px; bottom: 12px; width: 120px; height: 74px; border-radius: 10px; overflow: hidden;
+    background: var(--card); border: 1px solid var(--glass-edge); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .mm-map i { position: absolute; border-radius: 1.5px; opacity: .85; }
+  .mm-mic { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--shadow); }
+
+  /* cards: one fixed size, kind, title, text, the state at the foot with the moving line while an agent works */
+  .mm-card { --cw: 280px; --ch: 132px; position: absolute; z-index: 1; width: var(--cw); height: var(--ch); padding: 14px 15px 12px; border-radius: 14px;
+    background: var(--card); border: 1px solid var(--glass-edge); backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow); cursor: default; transition: opacity .3s, transform .2s, box-shadow .2s; }
+  .mm-card.fresh { animation: mm-pop .28s cubic-bezier(.2, 1.3, .4, 1); }
+  .mm-card.gone { opacity: 0; transform: scale(.95); }
+  .mm-card:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift); }
+  .mm-card::before { content: ""; position: absolute; left: 14px; top: -1px; width: 46px; height: 3px; border-radius: 0 0 3px 3px; background: var(--c); box-shadow: 0 0 10px var(--c); }
+  .mm-card .kind { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  .mm-card .ttl { display: block; margin-top: 1px; font-size: 16px; font-weight: 620; letter-spacing: -.012em; line-height: 1.2; }
+  .mm-card .ttl.untitled { color: var(--muted); font-weight: 400; font-style: italic; }
+  .mm-card .meta { margin: 4px 0 0; font-size: 13px; line-height: 1.38; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .mm-card .state { position: absolute; left: 15px; right: 15px; bottom: 10px; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--c); }
+  .mm-card .stroke { width: 36px; height: 2px; border-radius: 2px; background: color-mix(in srgb, var(--c) 22%, transparent); position: relative; overflow: hidden; }
+  .mm-card .stroke::after { content: ""; position: absolute; top: 0; bottom: 0; width: 14px; background: var(--c); border-radius: 2px; animation: mm-run 1.5s ease-in-out infinite alternate; }
+  .mm-card.static.a { left: 4%; top: 100px; } .mm-card.static.b { right: 4%; bottom: 88px; }
+  @keyframes mm-run { from { left: 0; } to { left: 22px; } }
+  @keyframes mm-pop { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* the sonar: where to double-click */
+  .mm-hint { position: absolute; z-index: 1; left: 50%; top: 52%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 20px; pointer-events: none; transition: opacity .4s; }
+  .mm-hint.done { opacity: 0; }
+  .sonar { position: relative; width: 14px; height: 14px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 12px var(--blue); }
+  .sonar i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--blue); opacity: 0; animation: mm-ping 2.4s ease-out infinite; }
+  .sonar i:nth-child(2) { animation-delay: .8s; } .sonar i:nth-child(3) { animation-delay: 1.6s; }
+  @keyframes mm-ping { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(5.5); opacity: 0; } }
+  .mm-label { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .mm .touch { display: none; }
+  @media (pointer: coarse) { .mm .pc { display: none; } .mm .touch { display: inline; } }
+
+  /* the open card, as the app unfolds it: dimmed canvas, a panel with the state's tab, title, state, description, Start agent */
+  .mm-dim { position: absolute; inset: 0; z-index: 4; background: var(--dim); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .mm-dim.on { opacity: 1; pointer-events: auto; cursor: default; }
+  .mm-panel { position: absolute; z-index: 5; display: none; overflow: hidden; border-radius: 14px; background: var(--panel); border: 1px solid var(--glass-edge);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift); cursor: default; }
+  .mm-panel.on { display: block; }
+  .mm-panel.anim { transition: left .3s cubic-bezier(.3, .9, .3, 1), top .3s cubic-bezier(.3, .9, .3, 1), width .3s cubic-bezier(.3, .9, .3, 1), height .3s cubic-bezier(.3, .9, .3, 1); }
+  .mm-panel::before { content: ""; position: absolute; left: 30px; top: -1px; width: 80px; height: 3px; border-radius: 0 0 3px 3px; background: var(--c); box-shadow: 0 0 12px var(--c); z-index: 1; }
+  .mm-panel .inner { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; min-width: 280px; padding: 26px 30px; opacity: 0; transition: opacity .12s; display: flex; flex-direction: column; }
+  .mm-panel.ready .inner { opacity: 1; }
+  .mm-panel .close { position: absolute; right: 14px; top: 12px; width: 32px; height: 32px; border: 0; border-radius: 10px; background: var(--chip); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
+  .mm-panel .p-kind { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .mm-panel .p-title { font-size: 28px; font-weight: 650; letter-spacing: -.018em; line-height: 1.12; margin: 2px 0 6px; }
+  .mm-panel .ph { color: var(--muted); font-weight: 400; font-style: italic; }
+  .mm-panel .p-state { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .mm-panel .p-body { margin-top: 18px; font-size: 15.5px; line-height: 1.5; min-height: 4.5em; padding: 12px 14px; border-radius: 10px; background: var(--chip); border: 1px solid var(--line); }
+  .mm-panel .p-body .ph { font-style: normal; }
+  .mm-panel .caret { display: inline-block; width: 1.5px; height: 1.1em; margin-left: 1px; vertical-align: -.15em; background: var(--ink); animation: mm-blink 1s steps(1) infinite; }
+  .mm-panel .p-foot { margin-top: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .mm-panel .btn { border-radius: 10px; padding: 9px 16px; font-size: 15px; font-family: inherit; border: 0; cursor: pointer; color: var(--ink); transition: transform .12s, filter .12s; }
+  .mm-panel .btn.primary { background: var(--blue); color: var(--on-ink); border-color: transparent; }
+  .mm-panel .btn.pressed { transform: scale(.95); filter: brightness(.88); }
+  .mm-panel .hint { font-size: 12px; line-height: 1.35; color: var(--muted); }
+  .mm-panel .btn { position: relative; }
+  .sonar.mini { position: absolute; right: -4px; top: -4px; width: 10px; height: 10px; display: none; box-shadow: 0 0 8px var(--blue); }
+  .btn.beckon .sonar.mini { display: block; }
+  .sonar.mini i { animation-name: mm-ping-s; }
+  @keyframes mm-ping-s { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(3.6); opacity: 0; } }
+  @keyframes mm-blink { 50% { opacity: 0; } }
+
+  @media (max-width: 760px) { .mm .hide-s { display: none !important; } }
+  @media (max-width: 640px) { .mm { height: 480px; } .mm-card { --cw: 232px; --ch: 124px; } .mm-map { display: none; } .mm-panel .inner { padding: 22px 20px; } .mm-panel .p-title { font-size: 24px; } }
+  @media (prefers-reduced-motion: reduce) { .sonar i { animation: none; opacity: .4; transform: scale(2.5); } .mm-card, .mm-card.fresh, .mm-panel.anim, .mm-dim, .mm-panel .inner { animation: none; transition: none; }
+    .mm-card .stroke::after, .mm-panel .caret { animation: none; } }
+</style>

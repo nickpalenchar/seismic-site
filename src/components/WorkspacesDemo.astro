@@ -1,0 +1,30 @@
+---
+// "Isolated workspace flows are built in": a static canvas with agents at work, and the inbox slid out on the right.
+---
+<div class="mm ws" role="img" aria-label="A canvas with several tasks being worked on in parallel, and the inbox open at the side listing what needs you">
+  <div class="mm-chrome"><div class="mm-bar"><img src="/img/logo.svg" alt="" width="26" height="26" /><span class="mm-pill"><b>Tipjar</b> <i>main</i></span>
+    <span class="mm-right"><span class="mm-pill">2 need you</span></span></div></div>
+  <div class="mm-card static" style="left:4%;top:80px;--c:var(--blue)"><span class="kind">Task · seismic/search</span><b class="ttl">Speed up search</b><p class="meta">Index card titles on write.</p><span class="state">Agent at work<i class="stroke"></i></span></div>
+  <div class="mm-card static" style="left:4%;top:236px;--c:var(--blue)"><span class="kind">Task · seismic/onboarding</span><b class="ttl">Onboarding checklist</b><p class="meta">Three steps on first launch.</p><span class="state">Agent at work<i class="stroke"></i></span></div>
+  <div class="mm-card static" style="left:calc(4% + 316px);top:158px;--c:var(--amber)"><span class="kind">Task · seismic/export</span><b class="ttl">Export the board as PDF</b><p class="meta">Resolving a merge conflict with search.</p><span class="state" style="color:var(--amber)">Needs you · demo ready</span></div>
+  <div class="mm-card static" style="left:calc(4% + 316px);top:314px;--c:var(--muted)"><span class="kind">Task</span><b class="ttl">Show usage in the bar</b><p class="meta">Waits for “Speed up search”.</p><span class="state" style="color:var(--muted)">In the queue</span></div>
+  <aside class="inbox">
+    <div class="cap">Inbox</div>
+    <div class="item"><b>Export the board as PDF</b><span>Demo ready. Approve or give feedback.</span></div>
+    <div class="item"><b>Onboarding checklist</b><span>Asks: dismiss per session, or for good?</span></div>
+    <div class="item quiet"><b>Speed up search</b><span>Conflict resolved on its own.</span></div>
+  </aside>
+</div>
+
+<style is:global>
+  .ws { height: 460px; cursor: default; }
+  .ws .mm-card { cursor: default; }
+  .ws .inbox { position: absolute; z-index: 3; right: 0; top: 54px; bottom: 0; width: min(300px, 44%); padding: 16px 14px; background: var(--glass); border-left: 1px solid var(--glass-edge);
+    backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5); box-shadow: -10px 0 30px -14px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 10px; }
+  .ws .inbox .cap { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .ws .inbox .item { padding: 10px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--glass-edge); font-size: 13px; line-height: 1.35; }
+  .ws .inbox .item b { display: block; font-size: 14px; } .ws .inbox .item span { color: var(--muted); }
+  .ws .inbox .item:not(.quiet) { box-shadow: 0 0 0 2px var(--amber); } .ws .inbox .quiet { opacity: .7; }
+  @media (max-width: 900px) { .ws .mm-card:nth-of-type(n+3) { display: none; } }
+  @media (max-width: 640px) { .ws { height: 400px; } .ws .mm-card { --cw: 150px; } .ws .inbox { width: 52%; } .ws .mm-card .meta { display: none; } }
+</style>
