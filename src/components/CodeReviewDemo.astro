@@ -1,0 +1,200 @@
+---
+// "Ensure quality with adversarial code reviews": the Review tab of an open card, as the app shows it
+// (design: Code reviews in Card lifecycle; detail.tsx FindingList / ReviewSubmit). Findings carry a severity,
+// an optional Security tag and file:line; per finding the owner picks "Fix it", "As a follow-up task" or "Ignore"
+// (a second click takes it back), then "Submit answers" to the current agent or "Submit to new agent" with a model choice.
+const findings = [
+  { id: 1, sev: 'critical', security: true, title: 'The theme from the URL is written into the page unescaped',
+    text: '`?theme=` goes straight into the toggle’s `innerHTML`, so a crafted link runs script in the visitor’s session.', where: 'src/toggle.ts:18', task: 'Escape the theme name from the URL' },
+  { id: 2, sev: 'major', title: 'A saved theme is never validated',
+    text: 'The value in `localStorage` is used as a class name. A stale or edited value leaves the page without any theme.', where: 'src/theme.ts:42', task: 'Validate the saved theme' },
+  { id: 3, sev: 'minor', title: 'The toggle has no accessible name',
+    text: 'It is an icon-only button; a screen reader announces just “button”.', where: 'src/ui/TopBar.tsx:77', task: 'Name the theme toggle' },
+  { id: 4, sev: 'info', title: 'The dark palette repeats two light tokens',
+    text: '`--line` and `--muted` are the same in both themes; probably an oversight, worth a look.', where: 'src/styles.css:31', task: 'Check the dark palette tokens' },
+];
+const md = (s: string) => s.replace(/`([^`]+)`/g, '<code>$1</code>');
+---
+<div class="cr" id="cr">
+  <div class="cr-panel">
+    <div class="cr-head">
+      <div class="rv-kind">Task</div>
+      <div class="rv-title">Add dark mode</div>
+      <div class="rv-state">● Demo ready · reviewed by Claude Code · Opus 5.5</div>
+    </div>
+    <div class="cr-tabs" role="presentation" aria-hidden="true">
+      <span>Demo</span>
+      <span class="on">Review <span id="cr-counts"></span></span>
+      <span>Diff</span>
+    </div>
+
+    <h4 class="p-h" id="cr-heading" aria-live="polite">4 findings</h4>
+    <div id="cr-list">
+      {findings.map((f) => (
+        <div class={`finding ${f.sev}${f.security ? ' security' : ''}`} data-id={f.id} data-task={f.task}>
+          <div class="f-head">
+            <span class="f-no">{f.id}</span>
+            <span class={`f-sev ${f.sev}`}>{f.sev}</span>
+            <b>{f.title}</b>
+            {f.security && <span class="f-tag">Security</span>}
+          </div>
+          <div class="f-text" set:html={md(f.text)} />
+          <div class="f-where"><code>{f.where}</code></div>
+          <div class="f-slot">
+            <div class="choices f-choices" role="group" aria-label={`What to do about finding ${f.id}`}>
+              <button type="button" class="choice" data-route="fix" aria-pressed="false" title="The card’s agent fixes it and hands over again, with a new demo where the change shows">Fix it</button>
+              <button type="button" class="choice" data-route="later" aria-pressed="false" title="The agent makes it a task of its own that follows up on this card">As a follow-up task</button>
+              <button type="button" class="choice" data-route="ignore" aria-pressed="false" title="Not pursued, and not sent to the agent.">Ignore</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+    <p class="hint" id="cr-hint">Choose per finding, then submit your answers here or send them with a message to the agent.</p>
+
+    <div class="review-submit" id="cr-submit" hidden>
+      <button type="button" class="btn primary" id="cr-send"><span>Submit answers</span><small>Claude Code · Opus 5.5</small></button>
+      <div class="cr-newagent">
+        <button type="button" class="btn" id="cr-new" aria-haspopup="true" aria-expanded="false">Submit to new agent</button>
+        <div class="cr-menu" id="cr-menu" hidden role="group" aria-label="Choose an agent for this start">
+          <p>This will create a new session with items to fix as its only context.</p>
+          <label>Harness <select id="cr-harness"><option>Claude Code</option><option>Codex</option></select></label>
+          <label>Model <select id="cr-model"><option>Fable 5.1</option><option>Opus 5.5</option><option>Sonnet 5.5</option></select></label>
+          <label>Effort <select id="cr-effort"><option>Medium</option><option>High</option><option>Max</option></select></label>
+          <button type="button" class="btn primary" id="cr-go">Start with this choice</button>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="cr-reset" id="cr-reset" hidden>Replay the demo</button>
+  </div>
+</div>
+
+<script>
+  const root = document.getElementById('cr')!;
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const items = [...root.querySelectorAll<HTMLElement>('.finding')];
+  const SEV_ORDER = ['critical', 'major', 'minor', 'info'];
+  type Route = 'fix' | 'later' | 'ignore';
+  type Status = 'open' | 'pending' | 'settled';
+  const state = new Map<number, { route: Route | null; status: Status }>();
+  const timers: number[] = [];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ids = (f: HTMLElement) => Number(f.dataset.id);
+  const initial = () => items.forEach((f) => state.set(ids(f), { route: null, status: 'open' }));
+  initial();
+  const originals = new Map(items.map((f) => [f, f.querySelector('.f-slot')!.innerHTML]));
+
+  function render() {
+    const open = items.filter((f) => state.get(ids(f))!.status !== 'settled');
+    const n = items.length;
+    $('cr-heading').textContent = open.length === 0 ? `${n} findings, all settled` : open.length === n ? `${n} findings` : `${open.length} of ${n} findings open`;
+    // the tab's open findings by severity, in colour; a green check when none is left
+    const counts = SEV_ORDER.map((s) => [s, open.filter((f) => f.classList.contains(s)).length] as const).filter(([, c]) => c > 0);
+    $('cr-counts').innerHTML = counts.length ? counts.map(([s, c]) => `<span class="rv-count ${s}">●${c}</span>`).join('') : '<span class="rv-clean" aria-label="No findings open">✓</span>';
+    const picked = items.filter((f) => { const s = state.get(ids(f))!; return s.status === 'open' && s.route; });
+    const undecided = items.some((f) => { const s = state.get(ids(f))!; return s.status === 'open' && !s.route; });
+    $('cr-hint').hidden = !undecided;
+    $('cr-submit').hidden = picked.length === 0;
+    items.forEach((f) => {
+      const s = state.get(ids(f))!;
+      f.querySelectorAll<HTMLElement>('.choice').forEach((b) => { const on = s.route === b.dataset.route; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    });
+  }
+
+  // a second click on a choice takes it back
+  root.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('.choice');
+    if (!b) return;
+    const f = b.closest<HTMLElement>('.finding')!; const s = state.get(ids(f))!;
+    if (s.status !== 'open') return;
+    s.route = s.route === b.dataset.route ? null : (b.dataset.route as Route);
+    render();
+  });
+
+  const status = (f: HTMLElement, html: string, cls = '') => { f.querySelector('.f-slot')!.innerHTML = `<div class="f-status ${cls}">${html}</div>`; };
+  const later = (cb: () => void, ms: number) => { timers.push(window.setTimeout(cb, reduce ? Math.min(ms, 200) : ms)); };
+
+  function submit(who: string) {
+    for (const f of items) {
+      const s = state.get(ids(f))!;
+      if (s.status !== 'open' || !s.route) continue;
+      const route = s.route; s.status = 'pending';
+      if (route === 'ignore') { s.status = 'settled'; f.classList.add('settled'); status(f, 'Ignored'); continue; }
+      if (route === 'fix') {
+        status(f, `${who} fixes it …`, 'pending');
+        later(() => { s.status = 'settled'; f.classList.add('settled'); status(f, 'Fixed by the agent'); render(); }, 2200);
+      } else {
+        status(f, 'Becoming a follow-up task …', 'pending');
+        later(() => { s.status = 'settled'; f.classList.add('settled'); status(f, `Follow-up task “${f.dataset.task}” →`); render(); }, 1600);
+      }
+    }
+    closeMenu(); render(); $('cr-reset').hidden = false;
+  }
+
+  const closeMenu = () => { $('cr-menu').hidden = true; $('cr-new').setAttribute('aria-expanded', 'false'); };
+  $('cr-send').addEventListener('click', () => submit('The agent'));
+  $('cr-new').addEventListener('click', () => { const h = $('cr-menu').hidden; $('cr-menu').hidden = !h; $('cr-new').setAttribute('aria-expanded', String(h)); });
+  $('cr-go').addEventListener('click', () => submit(`A new agent (${($('cr-model') as HTMLSelectElement).value})`));
+  document.addEventListener('click', (e) => { if (!(e.target as HTMLElement).closest('.cr-newagent')) closeMenu(); });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+
+  $('cr-reset').addEventListener('click', () => {
+    timers.splice(0).forEach(clearTimeout);
+    initial();
+    items.forEach((f) => { f.classList.remove('settled'); f.querySelector('.f-slot')!.innerHTML = originals.get(f)!; });
+    $('cr-reset').hidden = true; render();
+  });
+  render();
+</script>
+
+<style is:global>
+  .cr-panel { position: relative; border-radius: 14px; background: var(--panel); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift); padding: 26px 30px 24px; text-align: left; }
+  .cr-panel::before { content: ""; position: absolute; left: 30px; top: -1px; width: 80px; height: 3px; border-radius: 0 0 3px 3px; background: var(--amber); box-shadow: 0 0 12px var(--amber); }
+  .cr-tabs { display: flex; gap: 22px; margin: 18px 0 4px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+  .cr-tabs > span { padding: 6px 0 9px; margin-bottom: -1px; border-bottom: 2px solid transparent; }
+  .cr-tabs > span.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+  .cr .p-h { margin: 18px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .cr .rv-count { margin-left: 6px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--sev); }
+  .cr .rv-clean { margin-left: 6px; color: var(--green); font-weight: 700; }
+  .cr .rv-count, .cr .f-sev { --sev: #a17e00; }
+  .cr .rv-count.critical, .cr .f-sev.critical { --sev: #d00018; } .cr .rv-count.major, .cr .f-sev.major { --sev: #b93643; }
+  .cr .rv-count.minor, .cr .f-sev.minor { --sev: var(--amber); } .cr .rv-count.info, .cr .f-sev.info { --sev: var(--muted); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cr .rv-count.critical { --sev: #ff818c; } :root:not([data-theme="light"]) .cr .rv-count.major { --sev: #f4a0aa; } }
+  :root[data-theme="dark"] .cr .rv-count.critical { --sev: #ff818c; } :root[data-theme="dark"] .cr .rv-count.major { --sev: #f4a0aa; }
+
+  .cr .finding { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--card); font-size: 13.5px; transition: opacity .25s; }
+  .cr .finding.security { border-color: color-mix(in srgb, var(--pink) 50%, var(--line)); }
+  .cr .finding.settled { opacity: .7; }
+  .cr .f-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; font-size: 14.5px; }
+  .cr .f-no { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cr .f-sev { align-self: center; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 4px; color: var(--sev); background: color-mix(in srgb, var(--sev) 16%, transparent); }
+  .cr .f-sev.critical { color: #fff; background: #d00018; }
+  .cr .f-tag { font-size: 11px; color: var(--pink); border: 1px solid currentColor; border-radius: 8px; padding: 0 6px; }
+  .cr .f-text { margin-top: 4px; line-height: 1.45; }
+  .cr .f-text code, .cr .f-where code { font: .92em var(--mono); background: var(--chip); border-radius: 4px; padding: 0 .3em; }
+  .cr .f-where { margin-top: 4px; font-size: 12px; color: var(--muted); }
+  .cr .f-status { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .cr .f-status.pending { color: var(--blue); }
+  .cr .choices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .cr .choice { display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 9px; font: inherit; font-size: 13.5px; color: var(--ink); cursor: pointer;
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px; transition: border-color .12s, background .12s; }
+  .cr .choice:hover { border-color: var(--muted); }
+  .cr .choice::before { content: ""; flex: none; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--muted); background: var(--card); }
+  .cr .choice.on { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 9%, var(--card)); }
+  .cr .choice.on::before { border-color: var(--amber); background: radial-gradient(var(--amber) 0 3.5px, var(--card) 4px); }
+  .cr .hint { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+  .cr .hint[hidden], .cr [hidden] { display: none !important; }
+
+  .cr .review-submit { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+  .cr .review-submit .btn { border: 0; border-radius: 10px; padding: 8px 16px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--chip); color: var(--ink); height: 100%; }
+  .cr .review-submit .btn.primary { background: var(--blue); color: var(--on-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; }
+  .cr .review-submit .btn small { font-size: 9.5px; font-weight: 400; opacity: .85; }
+  .cr-newagent { position: relative; }
+  .cr-menu { position: absolute; z-index: 5; left: 0; bottom: calc(100% + 8px); width: min(340px, 82vw); padding: 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--ink); box-shadow: var(--lift); font-size: 14px; }
+  .cr-menu p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+  .cr-menu label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0; }
+  .cr-menu select { min-width: 0; max-width: 62%; font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .cr-menu .btn { width: 100%; justify-content: center; }
+  .cr-reset { margin-top: 14px; background: none; border: 0; padding: 0; font: inherit; font-size: 13px; color: var(--blue); text-decoration: underline; cursor: pointer; }
+  @media (max-width: 760px) { .cr-panel { padding: 22px 16px 20px; } .cr-panel::before { left: 16px; } }
+</style>

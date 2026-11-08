@@ -1,26 +1,36 @@
 ---
 import Base from '../layouts/Base.astro';
+import HeroGridLights from '../components/HeroGridLights.astro';
 import MindMapDemo from '../components/MindMapDemo.astro';
 import ReviewDemo from '../components/ReviewDemo.astro';
+import CodeReviewDemo from '../components/CodeReviewDemo.astro';
+import ComingSoonDemo from '../components/ComingSoonDemo.astro';
 import WorkspacesDemo from '../components/WorkspacesDemo.astro';
 ---
-<Base title="Seismic: employ your agents like a VP of Engineering">
+<Base title="Seismic: Hire your VP of Engineering">
   <main>
-    <section class="hero">
-      <h1>Employ your agents like a VP of Engineering</h1>
-      <p class="lede">Create tasks visually, on a canvas with infinite space. Group, arrange, and associate dependencies (or let agents do it).
-        Agents work in the background and record video demos that you approve.</p>
-      <div class="cta">
-        <a class="btn primary" href="/install/">Install</a>
-        <a class="btn" href="/demos/">See demos</a>
-      </div>
-    </section>
+    <div class="hero-mindmap-zone" id="hero-mindmap-zone">
+      <HeroGridLights />
+      
+      <section class="hero" id="hero">
+        <div class="hero-body">
+          <p class="eyebrow">Autonomous Agent Orchestration</p>
+          <h1 class="hero-title">Hire your VP of Engineering</h1>
+          <p class="lede">Create tasks visually, on a canvas with infinite space. Group, arrange, and associate dependencies (or let agents do it).
+            Agents work in the background and record video demos that you approve.</p>
+          <div class="cta">
+            <a class="btn primary" href="/install/">Install</a>
+            <a class="btn" href="/demos/">See demos</a>
+          </div>
+        </div>
+      </section>
 
-    <section class="section" id="mind-map">
-      <h2>Mind map your project</h2>
-      <p class="lede">Every project is a canvas, and each card is a task. Create the task anywhere. Agents start working.</p>
-      <MindMapDemo />
-    </section>
+      <section class="section" id="mind-map">
+        <h2>Mind map your project</h2>
+        <p class="lede">Every project is a canvas, and each card is a task. Create the task anywhere. Agents start working.</p>
+        <MindMapDemo />
+      </section>
+    </div>
 
     <section class="section" id="demos">
       <h2>Watch the demo instead of manually testing</h2>
@@ -36,28 +46,26 @@ import WorkspacesDemo from '../components/WorkspacesDemo.astro';
 
     <section class="section text" id="reviews">
       <h2>Ensure quality with adversarial code reviews</h2>
+      <p class="lede">A separate reviewer agent reads every change against your repository's own rules. You decide per finding: fix it, make it a follow-up, or ignore it.</p>
+      <CodeReviewDemo />
     </section>
 
+    {/* Hidden until it ships (listed under "More features coming soon"):
     <section class="section text" id="benchmarks">
       <h2>Benchmark your agents against real deliverables</h2>
       <h3>…and have them benchmark you</h3>
       <p class="lede">Any good VP is open to feedback. Seismic can teach you how to prompt agents better, while your feedback helps it get better. Bidirectional improvement.</p>
     </section>
+    */}
 
     <section class="section text" id="built-with">
-      <h2>Seismic is built with Seismic</h2>
+      <h2>Seismic is built with Seismic…</h2>
       <p class="lede">Demos are published live and regularly.</p>
     </section>
 
     <section class="section text" id="soon">
-      <h2>More features coming soon</h2>
-      <ul class="soon-list">
-        <li>Cloud support</li>
-        <li>Connect to Linear and Jira</li>
-        <li>Multiuser support</li>
-        <li>More harnesses: Pi, Hermes, OpenCode</li>
-        <li>MCP servers</li>
-      </ul>
+      <h2 class="small">…with more cards on the way</h2>
+      <ComingSoonDemo />
     </section>
   </main>
 </Base>

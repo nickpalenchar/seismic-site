@@ -1,0 +1,612 @@
+---
+// "More features coming soon" as an interactive canvas: one card per feature, with dependencies.
+// Reproduces Obeya's cutting-edge smooth transitions on a grid with cards and arrows:
+// - Cards can be freely dragged on the dotted grid, smoothly recalculating cubic Bézier arrows in real-time.
+// - Flowing energy pulses travel along dependency curves from prerequisite to dependent tasks.
+// - Connection handles (Obeya connection dots) appear on card edges.
+// - Hovering or clicking a card highlights its full dependency chain (amber for "comes first", purple for "waits for it").
+const cards = [
+  { id: 'cloud', x: 40, y: 50, t: 'Cloud support', d: 'Run workspaces and agents in the cloud.' },
+  { id: 'multi', x: 40, y: 250, t: 'Multiuser support', d: 'Share a canvas with your team.' },
+  { id: 'mcp', x: 380, y: 50, t: 'MCP server', d: 'Allow agents to connect to and drive Seismic itself.' },
+  { id: 'linear', x: 380, y: 250, t: 'Connect to Linear and Jira', d: 'Turn tickets into cards, report back.' },
+  { id: 'pi', x: 724, y: 74, t: 'Pi harness', d: 'Run tasks with Pi.' },
+  { id: 'hermes', x: 724, y: 214, t: 'Hermes harness', d: 'Run tasks with Hermes.' },
+  { id: 'opencode', x: 724, y: 354, t: 'OpenCode harness', d: 'Run tasks with OpenCode.' },
+  { id: 'bench', x: 380, y: 450, t: 'Benchmarks', d: 'Agents on real deliverables, and yourself.' },
+];
+// [prerequisite, the card that waits for it]
+const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['mcp', 'linear']];
+---
+<div class="mm cs" id="cs" role="group" aria-label="Features coming soon, drawn as cards on a canvas. Drag cards to rearrange, hover to trace dependencies."
+  data-waits={JSON.stringify(waits)} data-cards={JSON.stringify(cards)}>
+  
+  <div class="cs-controls" aria-hidden="true">
+    <span class="cs-tip">Drag cards anywhere · Hover to trace dependencies</span>
+    <button class="cs-reset-btn" id="cs-reset" type="button" title="Reset cards to original positions">Reset layout</button>
+  </div>
+
+  <div class="cs-world" id="cs-world">
+    <div class="cs-group" id="cs-group-harnesses" style="left:700px;top:34px;width:284px;height:478px"><span>Harnesses</span></div>
+    
+    <svg class="cs-deps" id="cs-deps" width="1000" height="620" aria-hidden="true">
+      <defs>
+        <!-- Arrow heads matching Obeya's depHead and orientation -->
+        <marker id="m-faint" class="faint" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0 1.5L9 5L0 8.5z" />
+        </marker>
+        <marker id="m-lit" class="lit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="11" markerHeight="11" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0 1.5L9 5L0 8.5z" />
+        </marker>
+        <marker id="m-first" class="lit-first" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="11" markerHeight="11" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0 1.5L9 5L0 8.5z" />
+        </marker>
+
+        <!-- Subtle glow filter for highlighted arrows -->
+        <filter id="cs-glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      
+      <!-- Base dependency paths container -->
+      <g id="cs-lines-base"></g>
+      <!-- Flowing energy pulses container -->
+      <g id="cs-lines-pulses"></g>
+    </svg>
+
+    {cards.map((c) => {
+      const queued = waits.some(([, to]) => to === c.id);
+      return (
+        <div class="mm-card static cs-card" data-id={c.id} style={`left:${c.x}px;top:${c.y}px;--c:var(--muted)`} tabindex="0">
+          <div class="cs-handles" aria-hidden="true">
+            <span class="cs-dot dot-t"></span>
+            <span class="cs-dot dot-r"></span>
+            <span class="cs-dot dot-b"></span>
+            <span class="cs-dot dot-l"></span>
+          </div>
+          <span class="kind">Task</span>
+          <b class="ttl">{c.t}</b>
+          <p class="meta">{c.d}</p>
+          <span class="state" style="color:var(--muted)">{queued ? <em>In the queue</em> : 'Planned'}</span>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+<script>
+  const root = document.getElementById('cs')!;
+  const world = document.getElementById('cs-world')!;
+  const svg = document.getElementById('cs-deps') as unknown as SVGSVGElement;
+  const baseLinesGroup = document.getElementById('cs-lines-base')!;
+  const pulseLinesGroup = document.getElementById('cs-lines-pulses')!;
+  const resetBtn = document.getElementById('cs-reset')!;
+
+  const edges: [string, string][] = JSON.parse(root.dataset.waits!);
+  const initialCardsData: { id: string; x: number; y: number }[] = JSON.parse(root.dataset.cards!);
+  const initialMap = new Map(initialCardsData.map((c) => [c.id, { x: c.x, y: c.y }]));
+
+  const cards = new Map([...root.querySelectorAll<HTMLElement>('.cs-card')].map((c) => [c.dataset.id!, c]));
+  const W = 1000, H = 620, HEAD = 10;
+  let currentScale = 1;
+
+  // Fit world size and scale to container
+  function fit() {
+    const w = root.clientWidth;
+    currentScale = Math.max(0.55, Math.min(1.35, w / W));
+    world.style.transform = `translateX(${Math.max(0, (w - W * currentScale) / 2)}px) scale(${currentScale})`;
+    root.style.height = H * currentScale + 'px';
+  }
+  new ResizeObserver(fit).observe(root);
+  fit();
+
+  type B = { x: number; y: number; w: number; h: number };
+  const box = (id: string): B => {
+    const c = cards.get(id)!;
+    return { x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight };
+  };
+
+  // Obeya's link curve (from obeya src/ui/parts.tsx linkCurve):
+  // Leaves facing edges square into the cards, square into the arrow head
+  function path(a: B, b: B): string {
+    const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
+    const gapY = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+    const across = gapX > gapY;
+    const dir = (across ? Math.sign(b.x + b.w / 2 - (a.x + a.w / 2)) : Math.sign(b.y + b.h / 2 - (a.y + a.h / 2))) || 1;
+    const [x1, y1] = across ? [dir > 0 ? a.x + a.w : a.x, a.y + a.h / 2] : [a.x + a.w / 2, dir > 0 ? a.y + a.h : a.y];
+    const [x2, y2] = across ? [(dir > 0 ? b.x : b.x + b.w) - dir * HEAD, b.y + b.h / 2] : [b.x + b.w / 2, (dir > 0 ? b.y : b.y + b.h) - dir * HEAD];
+    const along = across ? x2 - x1 : y2 - y1;
+    const aside = across ? y2 - y1 : x2 - x1;
+    const reach = dir * Math.max((dir * along) / 2, Math.min(Math.abs(aside) / 2, HEAD));
+    const [c1x, c1y, c2x, c2y] = across ? [x1 + reach, y1, x2 - reach, y2] : [x1, y1 + reach, x2, y2 - reach];
+    return `M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`;
+  }
+
+  // Create SVG lines and flowing pulse paths
+  const lineElements = edges.map(([from, to]) => {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    pulse.setAttribute('class', 'cs-pulse');
+
+    const d = path(box(from), box(to));
+    p.setAttribute('d', d);
+    pulse.setAttribute('d', d);
+
+    baseLinesGroup.appendChild(p);
+    pulseLinesGroup.appendChild(pulse);
+
+    return { from, to, p, pulse };
+  });
+
+  function updateLinesForCard(cardId: string) {
+    for (const item of lineElements) {
+      if (item.from === cardId || item.to === cardId) {
+        const d = path(box(item.from), box(item.to));
+        item.p.setAttribute('d', d);
+        item.pulse.setAttribute('d', d);
+      }
+    }
+  }
+
+  function updateAllLines() {
+    for (const item of lineElements) {
+      const d = path(box(item.from), box(item.to));
+      item.p.setAttribute('d', d);
+      item.pulse.setAttribute('d', d);
+    }
+  }
+
+  // Obeya depsOf dependency tree calculator
+  function depsOf(id: string) {
+    const behind = (x: string) => edges.filter(([, to]) => to === x).map(([from]) => from);
+    const ahead = (x: string) => edges.filter(([from]) => from === x).map(([, to]) => to);
+    const walk = (next: (x: string) => string[]) => {
+      const seen = new Set<string>();
+      const todo = [id];
+      while (todo.length) {
+        for (const y of next(todo.pop()!)) {
+          if (y !== id && !seen.has(y)) {
+            seen.add(y);
+            todo.push(y);
+          }
+        }
+      }
+      return seen;
+    };
+    const before = walk(behind);
+    const after = walk(ahead);
+    const first = new Set(edges.filter(([from, to]) => before.has(from) && (before.has(to) || to === id)).map((e) => e.join(' ')));
+    const lit = new Set(edges.filter(([from, to]) => (before.has(from) || from === id || after.has(from)) && (before.has(to) || to === id || after.has(to))).map((e) => e.join(' ')));
+    return { before, after, first, lit };
+  }
+
+  let currentHover: string | null = null;
+
+  function show(id: string | null) {
+    currentHover = id;
+    const d = id ? depsOf(id) : null;
+
+    for (const [cid, el] of cards) {
+      el.classList.toggle('dep-self', cid === id);
+      el.classList.toggle('dep-before', !!d?.before.has(cid));
+      el.classList.toggle('dep-after', !!d?.after.has(cid));
+      el.querySelector('.dep-tag')?.remove();
+
+      if (d?.before.has(cid) || d?.after.has(cid)) {
+        const t = document.createElement('div');
+        t.className = 'dep-tag';
+        t.textContent = d.before.has(cid) ? 'comes first' : 'waits for it';
+        el.appendChild(t);
+      }
+    }
+
+    for (const { from, to, p, pulse } of lineElements) {
+      const key = `${from} ${to}`;
+      const kind = d && d.lit.has(key) ? (d.first.has(key) ? 'first' : 'lit') : 'faint';
+      const clsName = kind === 'first' ? 'lit-first' : kind;
+
+      p.setAttribute('class', clsName);
+      p.setAttribute('marker-end', `url(#m-${kind})`);
+      pulse.setAttribute('class', `cs-pulse ${clsName}`);
+
+      if (kind !== 'faint') {
+        baseLinesGroup.appendChild(p); // bring lit above faint
+        pulseLinesGroup.appendChild(pulse);
+      }
+    }
+  }
+
+  // Card dragging mechanics with live Bézier arrow updating
+  let draggedCard: HTMLElement | null = null;
+  let dragOffset = { x: 0, y: 0 };
+  let hasMoved = false;
+
+  for (const [id, el] of cards) {
+    el.addEventListener('pointerdown', (e) => {
+      if ((e.target as HTMLElement).closest('.cs-dot')) return;
+      draggedCard = el;
+      hasMoved = false;
+
+      const rect = el.getBoundingClientRect();
+      const worldRect = world.getBoundingClientRect();
+
+      // Pointer offset inside card in world coords
+      dragOffset = {
+        x: (e.clientX - rect.left) / currentScale,
+        y: (e.clientY - rect.top) / currentScale,
+      };
+
+      el.setPointerCapture(e.pointerId);
+      el.classList.add('dragging');
+      e.stopPropagation();
+    });
+
+    el.addEventListener('pointermove', (e) => {
+      if (!draggedCard || draggedCard !== el) return;
+      hasMoved = true;
+
+      const worldRect = world.getBoundingClientRect();
+      const newX = (e.clientX - worldRect.left) / currentScale - dragOffset.x;
+      const newY = (e.clientY - worldRect.top) / currentScale - dragOffset.y;
+
+      // Constrain within world bounds
+      const clampedX = Math.max(10, Math.min(newX, W - el.offsetWidth - 10));
+      const clampedY = Math.max(10, Math.min(newY, H - el.offsetHeight - 10));
+
+      el.style.left = `${clampedX}px`;
+      el.style.top = `${clampedY}px`;
+
+      requestAnimationFrame(() => updateLinesForCard(id));
+    });
+
+    const finishDrag = (e: PointerEvent) => {
+      if (draggedCard === el) {
+        el.classList.remove('dragging');
+        try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+        draggedCard = null;
+
+        // Subtle magnetic grid snap to nearest 10px
+        const currentX = parseFloat(el.style.left || '0');
+        const currentY = parseFloat(el.style.top || '0');
+        const snappedX = Math.round(currentX / 10) * 10;
+        const snappedY = Math.round(currentY / 10) * 10;
+
+        el.style.left = `${snappedX}px`;
+        el.style.top = `${snappedY}px`;
+        updateLinesForCard(id);
+      }
+    };
+
+    el.addEventListener('pointerup', finishDrag);
+    el.addEventListener('pointercancel', finishDrag);
+
+    // Hover & focus handling
+    el.addEventListener('pointerenter', () => {
+      if (!draggedCard) show(id);
+    });
+
+    el.addEventListener('focus', () => {
+      if (!draggedCard) show(id);
+    });
+
+    el.addEventListener('click', () => {
+      if (hasMoved) return; // avoid toggle if dragged
+      show(currentHover === id ? null : id);
+    });
+  }
+
+  world.addEventListener('pointerleave', () => {
+    if (!draggedCard) show(null);
+  });
+
+  // Initial highlight to showcase dependencies
+  show('multi');
+
+  // Reset layout button
+  resetBtn.addEventListener('click', () => {
+    for (const [id, el] of cards) {
+      const orig = initialMap.get(id);
+      if (orig) {
+        el.classList.add('snapping');
+        el.style.left = `${orig.x}px`;
+        el.style.top = `${orig.y}px`;
+      }
+    }
+
+    setTimeout(() => {
+      for (const [, el] of cards) el.classList.remove('snapping');
+      updateAllLines();
+    }, 320);
+
+    // Update lines during animation
+    const t0 = performance.now();
+    function animateLines() {
+      updateAllLines();
+      if (performance.now() - t0 < 350) {
+        requestAnimationFrame(animateLines);
+      }
+    }
+    requestAnimationFrame(animateLines);
+  });
+</script>
+
+<style is:global>
+  /* Full width of the window, breaking out of the container with dotted board background */
+  .cs {
+    position: relative;
+    cursor: default;
+    overflow: hidden;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .cs-controls {
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    top: 14px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+
+  .cs-tip {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--glass-edge);
+    padding: 5px 14px;
+    border-radius: 999px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: var(--shadow);
+  }
+
+  .cs-reset-btn {
+    pointer-events: auto;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--glass-edge);
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow);
+    transition: transform .15s, box-shadow .15s, background .15s;
+  }
+
+  .cs-reset-btn:hover {
+    transform: translateY(-1.5px);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift);
+    background: var(--glass);
+  }
+
+  .cs-world {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1000px;
+    height: 620px;
+    transform-origin: 0 0;
+  }
+
+  /* SVG Dependency Arrows */
+  .cs-deps {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .cs-deps path {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.8;
+    stroke: color-mix(in srgb, var(--muted) 45%, transparent);
+    transition: stroke .25s ease, stroke-width .25s ease;
+  }
+
+  .cs-deps path.lit {
+    stroke: var(--purple);
+    stroke-width: 2.6;
+    filter: url(#cs-glow);
+  }
+
+  .cs-deps path.lit-first {
+    stroke: var(--amber);
+    stroke-width: 2.6;
+    filter: url(#cs-glow);
+  }
+
+  /* Flowing light pulse along the dependency curve */
+  .cs-pulse {
+    fill: none !important;
+    stroke-linecap: round;
+    stroke-dasharray: 10 160;
+    stroke-dashoffset: 0;
+    animation: csFlow 2.8s linear infinite;
+    pointer-events: none;
+  }
+
+  .cs-pulse.faint {
+    stroke: color-mix(in srgb, var(--muted) 75%, #ffffff);
+    stroke-width: 2.4;
+    opacity: 0.6;
+  }
+
+  .cs-pulse.lit {
+    stroke: #ffffff;
+    stroke-width: 3.4;
+    filter: drop-shadow(0 0 6px var(--purple));
+    animation-duration: 1.8s;
+  }
+
+  .cs-pulse.lit-first {
+    stroke: #ffffff;
+    stroke-width: 3.4;
+    filter: drop-shadow(0 0 6px var(--amber));
+    animation-duration: 1.8s;
+  }
+
+  @keyframes csFlow {
+    from { stroke-dashoffset: 170; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* Marker arrow heads */
+  .cs-deps marker.faint path {
+    fill: color-mix(in srgb, var(--muted) 70%, transparent);
+    stroke: none;
+  }
+
+  .cs-deps marker.lit path {
+    fill: var(--purple);
+    stroke: none;
+  }
+
+  .cs-deps marker.lit-first path {
+    fill: var(--amber);
+    stroke: none;
+  }
+
+  /* Harness territory grouping */
+  .cs-group {
+    position: absolute;
+    z-index: 0;
+    border-radius: 22px;
+    border: 1.5px solid color-mix(in srgb, var(--teal) 38%, transparent);
+    background: color-mix(in srgb, var(--teal) 8%, transparent);
+    pointer-events: none;
+  }
+
+  .cs-group span {
+    position: absolute;
+    left: 22px;
+    top: -11px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: var(--teal);
+    background: var(--panel);
+    border-radius: 6px;
+  }
+
+  /* Cards */
+  .cs-card {
+    --cw: 240px;
+    --ch: 128px;
+    z-index: 2;
+    cursor: grab;
+    touch-action: none;
+    transition: transform .2s cubic-bezier(.2, .9, .3, 1), box-shadow .2s ease;
+  }
+
+  .cs-card.snapping {
+    transition: left .32s cubic-bezier(.2, .9, .3, 1), top .32s cubic-bezier(.2, .9, .3, 1), transform .2s ease, box-shadow .2s ease;
+  }
+
+  .cs-card.dragging {
+    cursor: grabbing;
+    z-index: 10;
+    transform: translateY(-5px) scale(1.03) rotate(-1deg);
+    box-shadow: inset 0 1px 0 var(--glass-hi), 0 20px 48px -12px rgba(20, 45, 80, .55);
+  }
+
+  .cs-card .meta {
+    -webkit-line-clamp: 2;
+  }
+
+  .cs-card .state em {
+    font-style: italic;
+    font-weight: 500;
+  }
+
+  /* Connection handles on 4 sides (Obeya style) */
+  .cs-handles {
+    position: absolute;
+    inset: -6px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s ease;
+  }
+
+  .cs-card:hover .cs-handles {
+    opacity: 1;
+  }
+
+  .cs-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1.5px solid var(--muted);
+    box-shadow: 0 0 6px rgba(0,0,0,.15);
+  }
+
+  .dot-t { left: 50%; top: 2px; transform: translateX(-50%); }
+  .dot-r { right: 2px; top: 50%; transform: translateY(-50%); }
+  .dot-b { left: 50%; bottom: 2px; transform: translateX(-50%); }
+  .dot-l { left: 2px; top: 50%; transform: translateY(-50%); }
+
+  /* Highlighting dependencies */
+  .cs-card.dep-self, .cs-card.dep-before, .cs-card.dep-after {
+    transform: none;
+  }
+
+  .cs-card.dep-self, .cs-card.dep-after {
+    box-shadow: 0 0 0 2.5px var(--purple), var(--lift);
+  }
+
+  .cs-card.dep-before {
+    box-shadow: 0 0 0 2.5px var(--amber), var(--lift);
+  }
+
+  .cs-card .dep-tag {
+    position: absolute;
+    left: 14px;
+    top: -10px;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    background: var(--purple);
+    color: var(--on-ink);
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  }
+
+  .cs-card.dep-before .dep-tag {
+    background: var(--amber);
+  }
+
+  @media (max-width: 640px) {
+    .cs-tip { display: none; }
+    .cs-controls { justify-content: flex-end; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cs-pulse { animation: none; display: none; }
+    .cs-card, .cs-card.dragging, .cs-card.snapping { transition: none; transform: none !important; }
+  }
+</style>

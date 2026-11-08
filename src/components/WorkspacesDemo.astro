@@ -1,13 +1,61 @@
 ---
-// "Isolated workspace flows are built in": a static canvas with agents at work, and the inbox slid out on the right.
+// "Isolated workspace flows are built in": a canvas with parallel agents at work,
+// connected by dependency arrows and merge conflict coordination lines, with the inbox slid out on the right.
 ---
-<div class="mm ws" role="img" aria-label="A canvas with several tasks being worked on in parallel, and the inbox open at the side listing what needs you">
-  <div class="mm-chrome"><div class="mm-bar"><img src="/img/logo.svg" alt="" width="26" height="26" /><span class="mm-pill"><b>Tipjar</b> <i>main</i></span>
-    <span class="mm-right"><span class="mm-pill">2 need you</span></span></div></div>
-  <div class="mm-card static" style="left:4%;top:80px;--c:var(--blue)"><span class="kind">Task · seismic/search</span><b class="ttl">Speed up search</b><p class="meta">Index card titles on write.</p><span class="state">Agent at work<i class="stroke"></i></span></div>
-  <div class="mm-card static" style="left:4%;top:236px;--c:var(--blue)"><span class="kind">Task · seismic/onboarding</span><b class="ttl">Onboarding checklist</b><p class="meta">Three steps on first launch.</p><span class="state">Agent at work<i class="stroke"></i></span></div>
-  <div class="mm-card static" style="left:calc(4% + 316px);top:158px;--c:var(--amber)"><span class="kind">Task · seismic/export</span><b class="ttl">Export the board as PDF</b><p class="meta">Resolving a merge conflict with search.</p><span class="state" style="color:var(--amber)">Needs you · demo ready</span></div>
-  <div class="mm-card static" style="left:calc(4% + 316px);top:314px;--c:var(--muted)"><span class="kind">Task</span><b class="ttl">Show usage in the bar</b><p class="meta">Waits for “Speed up search”.</p><span class="state" style="color:var(--muted)">In the queue</span></div>
+<div class="mm ws" id="ws" role="img" aria-label="A canvas with several tasks being worked on in parallel with dependency arrows, and the inbox open at the side">
+  <div class="mm-chrome">
+    <div class="mm-bar">
+      <img src="/img/logo.svg" alt="" width="26" height="26" />
+      <span class="mm-pill"><b>Tipjar</b> <i>main</i></span>
+      <span class="mm-right"><span class="mm-pill">2 need you</span></span>
+    </div>
+  </div>
+
+  <svg class="ws-deps" id="ws-deps" aria-hidden="true">
+    <defs>
+      <marker id="ws-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0 1.5L9 5L0 8.5z" fill="var(--muted)" />
+      </marker>
+      <marker id="ws-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0 1.5L9 5L0 8.5z" fill="var(--amber)" />
+      </marker>
+    </defs>
+    <!-- Arrow: Speed up search -> Show usage in the bar -->
+    <path id="ws-line-wait" class="ws-path" marker-end="url(#ws-arrow)" />
+    <path id="ws-pulse-wait" class="ws-pulse" />
+
+    <!-- Conflict sync line: Speed up search -> Export PDF -->
+    <path id="ws-line-conflict" class="ws-path conflict" />
+  </svg>
+
+  <div class="mm-card static ws-card" id="ws-c1" style="left:4%;top:80px;--c:var(--blue)">
+    <span class="kind">Task · seismic/search</span>
+    <b class="ttl">Speed up search</b>
+    <p class="meta">Index card titles on write.</p>
+    <span class="state">Agent at work<i class="stroke"></i></span>
+  </div>
+
+  <div class="mm-card static ws-card" id="ws-c2" style="left:4%;top:236px;--c:var(--blue)">
+    <span class="kind">Task · seismic/onboarding</span>
+    <b class="ttl">Onboarding checklist</b>
+    <p class="meta">Three steps on first launch.</p>
+    <span class="state">Agent at work<i class="stroke"></i></span>
+  </div>
+
+  <div class="mm-card static ws-card" id="ws-c3" style="left:calc(4% + 316px);top:158px;--c:var(--amber)">
+    <span class="kind">Task · seismic/export</span>
+    <b class="ttl">Export the board as PDF</b>
+    <p class="meta">Resolving a merge conflict with search.</p>
+    <span class="state" style="color:var(--amber)">Needs you · demo ready</span>
+  </div>
+
+  <div class="mm-card static ws-card" id="ws-c4" style="left:calc(4% + 316px);top:314px;--c:var(--muted)">
+    <span class="kind">Task</span>
+    <b class="ttl">Show usage in the bar</b>
+    <p class="meta">Waits for “Speed up search”.</p>
+    <span class="state" style="color:var(--muted)">In the queue</span>
+  </div>
+
   <aside class="inbox">
     <div class="cap">Inbox</div>
     <div class="item"><b>Export the board as PDF</b><span>Demo ready. Approve or give feedback.</span></div>
@@ -16,15 +64,147 @@
   </aside>
 </div>
 
+<script>
+  const wsArea = document.getElementById('ws');
+  const lineWait = document.getElementById('ws-line-wait') as SVGPathElement | null;
+  const pulseWait = document.getElementById('ws-pulse-wait') as SVGPathElement | null;
+  const lineConflict = document.getElementById('ws-line-conflict') as SVGPathElement | null;
+
+  const c1 = document.getElementById('ws-c1');
+  const c3 = document.getElementById('ws-c3');
+  const c4 = document.getElementById('ws-c4');
+
+  function updateWorkspaceLines() {
+    if (!wsArea || !lineWait || !c1 || !c4) return;
+    const rRoot = wsArea.getBoundingClientRect();
+    const r1 = c1.getBoundingClientRect();
+    const r4 = c4.getBoundingClientRect();
+
+    const box1 = {
+      x: r1.left - rRoot.left,
+      y: r1.top - rRoot.top,
+      w: r1.width,
+      h: r1.height,
+    };
+
+    const box4 = {
+      x: r4.left - rRoot.left,
+      y: r4.top - rRoot.top,
+      w: r4.width,
+      h: r4.height,
+    };
+
+    // Bézier curve from c1 right to c4 left
+    const startX = box1.x + box1.w;
+    const startY = box1.y + box1.h / 2;
+    const endX = box4.x - 10;
+    const endY = box4.y + box4.h / 2;
+    const dx = endX - startX;
+
+    const dWait = `M${startX},${startY} C${startX + dx * 0.5},${startY} ${endX - dx * 0.5},${endY} ${endX},${endY}`;
+    lineWait.setAttribute('d', dWait);
+    if (pulseWait) pulseWait.setAttribute('d', dWait);
+
+    if (c3 && lineConflict) {
+      const r3 = c3.getBoundingClientRect();
+      const box3 = {
+        x: r3.left - rRoot.left,
+        y: r3.top - rRoot.top,
+        w: r3.width,
+        h: r3.height,
+      };
+
+      const cStartX = box1.x + box1.w;
+      const cStartY = box1.y + box1.h / 2;
+      const cEndX = box3.x - 4;
+      const cEndY = box3.y + box3.h / 2;
+      const cdx = cEndX - cStartX;
+
+      const dConflict = `M${cStartX},${cStartY} C${cStartX + cdx * 0.5},${cStartY} ${cEndX - cdx * 0.5},${cEndY} ${cEndX},${cEndY}`;
+      lineConflict.setAttribute('d', dConflict);
+    }
+  }
+
+  window.addEventListener('resize', updateWorkspaceLines);
+  setTimeout(updateWorkspaceLines, 50);
+  setTimeout(updateWorkspaceLines, 300);
+</script>
+
 <style is:global>
-  .ws { height: 460px; cursor: default; }
+  .ws { height: 460px; cursor: default; position: relative; }
   .ws .mm-card { cursor: default; }
-  .ws .inbox { position: absolute; z-index: 3; right: 0; top: 54px; bottom: 0; width: min(300px, 44%); padding: 16px 14px; background: var(--glass); border-left: 1px solid var(--glass-edge);
-    backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5); box-shadow: -10px 0 30px -14px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 10px; }
+
+  .ws-deps {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .ws-path {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.8;
+    stroke: color-mix(in srgb, var(--muted) 45%, transparent);
+    transition: stroke .2s;
+  }
+
+  .ws-path.conflict {
+    stroke: var(--amber);
+    stroke-width: 1.8;
+    stroke-dasharray: 5 4;
+    opacity: 0.7;
+    animation: wsDash 18s linear infinite;
+  }
+
+  @keyframes wsDash {
+    to { stroke-dashoffset: -100; }
+  }
+
+  .ws-pulse {
+    fill: none;
+    stroke: var(--blue);
+    stroke-width: 2.8;
+    stroke-linecap: round;
+    stroke-dasharray: 10 140;
+    stroke-dashoffset: 0;
+    animation: wsFlow 2.4s linear infinite;
+    filter: drop-shadow(0 0 5px var(--blue));
+  }
+
+  @keyframes wsFlow {
+    from { stroke-dashoffset: 150; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  .ws .inbox {
+    position: absolute;
+    z-index: 3;
+    right: 0;
+    top: 54px;
+    bottom: 0;
+    width: min(300px, 44%);
+    padding: 16px 14px;
+    background: var(--glass);
+    border-left: 1px solid var(--glass-edge);
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    box-shadow: -10px 0 30px -14px rgba(0,0,0,.35);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
   .ws .inbox .cap { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   .ws .inbox .item { padding: 10px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--glass-edge); font-size: 13px; line-height: 1.35; }
-  .ws .inbox .item b { display: block; font-size: 14px; } .ws .inbox .item span { color: var(--muted); }
-  .ws .inbox .item:not(.quiet) { box-shadow: 0 0 0 2px var(--amber); } .ws .inbox .quiet { opacity: .7; }
+  .ws .inbox .item b { display: block; font-size: 14px; }
+  .ws .inbox .item span { color: var(--muted); }
+  .ws .inbox .item:not(.quiet) { box-shadow: 0 0 0 2px var(--amber); }
+  .ws .inbox .quiet { opacity: .7; }
+
   @media (max-width: 900px) { .ws .mm-card:nth-of-type(n+3) { display: none; } }
   @media (max-width: 640px) { .ws { height: 400px; } .ws .mm-card { --cw: 150px; } .ws .inbox { width: 52%; } .ws .mm-card .meta { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .ws-pulse, .ws-path.conflict { animation: none; } }
 </style>

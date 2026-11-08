@@ -1,0 +1,350 @@
+---
+// "HeroGridLights": subtle, illuminated dotted grid animation based on card status colors.
+// - Card status colors: blues, greens, purples, and greys.
+// - Gentle, soft illumination (no sparkles, glints, or harsh flares).
+// - Starts immediately on page load, sweeping top-left to bottom-right at a smooth, graceful speed.
+// - No streaks after that: pure calm grid panning, with subtle soft illumination following the mouse hover.
+// - Extends through the hero and into the "Mind map your project" area, stopping cleanly above the demo mockup.
+---
+<div class="hero-lights-container" id="hero-lights-wrap" aria-hidden="true">
+  <canvas id="hero-lights-canvas"></canvas>
+</div>
+
+<script>
+  interface LitPoint {
+    col: number;
+    row: number;
+    intensity: number;
+    decay: number;
+    colorIndex: number;
+  }
+
+  const container = document.getElementById('hero-lights-wrap');
+  const canvas = document.getElementById('hero-lights-canvas') as HTMLCanvasElement | null;
+  const parentZone = document.getElementById('hero-mindmap-zone') || document.getElementById('hero') || container?.parentElement;
+  const mmDemo = document.getElementById('mm');
+
+  if (container && canvas && parentZone) {
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const GRID = 22; // 22px pitch dotted grid matching Obeya / Seismic frost look
+      const PAN_SPEED = 18; // Smooth, gentle diagonal panning
+      // Top-left to bottom-right direction (+1, +1) normalized
+      const DIR_X = Math.SQRT1_2;
+      const DIR_Y = Math.SQRT1_2;
+
+      let width = 0;
+      let height = 0;
+      let dpr = 1;
+      let animId = 0;
+      let isVisible = true;
+      let lastTime = performance.now();
+
+      // Panning offset
+      let panX = 0;
+      let panY = 0;
+
+      // Initial diagonal sweep: starts immediately on page load at top-left
+      // Graceful, measured speed (not too fast, not too slow)
+      let sweepDist = -30;
+      const sweepSpeed = 540; // px/sec: smooth, deliberate cascade across the zone
+      const sweepBand = 120; // soft bell-curve wavefront width
+      let sweepDone = false;
+
+      // Active illuminated points: map of "col,row" -> LitPoint
+      const litPoints = new Map<string, LitPoint>();
+
+      // Mouse tracking
+      let mouseX = -9999;
+      let mouseY = -9999;
+      let mouseActive = false;
+
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function isDark(): boolean {
+        const theme = document.documentElement.dataset.theme;
+        if (theme === 'dark') return true;
+        if (theme === 'light') return false;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+
+      // Card status colors: blues, greens, purples, and greys
+      function getStatusPalette() {
+        const dark = isDark();
+        return {
+          dotBg: dark ? 'rgba(150, 180, 220, 0.08)' : 'rgba(70, 100, 140, 0.12)',
+          // 0: Blue (working), 1: Green (approved), 2: Purple (proposal), 3: Grey (planned/muted)
+          statusColors: dark
+            ? [
+                { core: 'rgba(106, 162, 255, 0.62)', glow: 'rgba(106, 162, 255, 0.38)' }, // Blue
+                { core: 'rgba(111, 207, 106, 0.58)', glow: 'rgba(111, 207, 106, 0.35)' }, // Green
+                { core: 'rgba(167, 139, 255, 0.60)', glow: 'rgba(167, 139, 255, 0.36)' }, // Purple
+                { core: 'rgba(143, 163, 187, 0.52)', glow: 'rgba(143, 163, 187, 0.30)' }, // Grey
+              ]
+            : [
+                { core: 'rgba(47, 111, 232, 0.58)',  glow: 'rgba(47, 111, 232, 0.34)' }, // Blue
+                { core: 'rgba(47, 154, 63, 0.54)',   glow: 'rgba(47, 154, 63, 0.30)' },  // Green
+                { core: 'rgba(122, 82, 224, 0.56)',  glow: 'rgba(122, 82, 224, 0.32)' }, // Purple
+                { core: 'rgba(100, 116, 139, 0.48)', glow: 'rgba(100, 116, 139, 0.26)' }, // Grey
+              ],
+        };
+      }
+
+      function resize() {
+        if (!container || !canvas || !parentZone) return;
+        const zoneRect = parentZone.getBoundingClientRect();
+
+        // Extends through hero and into "Mind map your project", staying strictly above #mm
+        let targetHeight = zoneRect.height;
+        if (mmDemo) {
+          const mmRect = mmDemo.getBoundingClientRect();
+          targetHeight = Math.max(280, mmRect.top - zoneRect.top - 18);
+        }
+
+        container.style.height = `${targetHeight}px`;
+
+        const rect = container.getBoundingClientRect();
+        width = rect.width;
+        height = rect.height;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+
+        ctx.resetTransform?.();
+        ctx.scale(dpr, dpr);
+      }
+
+      // Stable card status color index per grid coordinate
+      function colorIndexFor(col: number, row: number): number {
+        return Math.abs((col * 3 + row * 7 + 11) % 4);
+      }
+
+      function illuminatePoint(col: number, row: number, targetIntensity: number, decay = 0.52) {
+        const key = `${col},${row}`;
+        const existing = litPoints.get(key);
+        if (existing) {
+          if (targetIntensity > existing.intensity) {
+            existing.intensity = targetIntensity;
+            existing.decay = decay;
+          }
+          return;
+        }
+
+        litPoints.set(key, {
+          col,
+          row,
+          intensity: targetIntensity,
+          decay,
+          colorIndex: colorIndexFor(col, row),
+        });
+      }
+
+      // Track pointer over parent zone (hero + mind map header)
+      parentZone.addEventListener('pointermove', (e) => {
+        const rect = container.getBoundingClientRect();
+        const curX = (e as MouseEvent).clientX - rect.left;
+        const curY = (e as MouseEvent).clientY - rect.top;
+
+        if (curX >= 0 && curX <= width && curY >= 0 && curY <= height) {
+          mouseX = curX;
+          mouseY = curY;
+          mouseActive = true;
+        } else {
+          mouseActive = false;
+        }
+      });
+
+      parentZone.addEventListener('pointerleave', () => {
+        mouseActive = false;
+        mouseX = -9999;
+        mouseY = -9999;
+      });
+
+      function frame(now: number) {
+        if (!isVisible) {
+          animId = requestAnimationFrame(frame);
+          return;
+        }
+
+        const dt = Math.min((now - lastTime) / 1000, 0.08);
+        lastTime = now;
+
+        ctx.clearRect(0, 0, width, height);
+
+        if (!reduceMotion) {
+          // Continuous gentle panning from top-left to bottom-right
+          panX += DIR_X * PAN_SPEED * dt;
+          panY += DIR_Y * PAN_SPEED * dt;
+        }
+
+        const effectivePanX = ((panX % GRID) + GRID) % GRID;
+        const effectivePanY = ((panY % GRID) + GRID) % GRID;
+
+        const gridBaseCol = Math.floor(-panX / GRID);
+        const gridBaseRow = Math.floor(-panY / GRID);
+
+        const cols = Math.ceil(width / GRID) + 2;
+        const rows = Math.ceil(height / GRID) + 2;
+
+        const { dotBg, statusColors } = getStatusPalette();
+
+        // 1. Initial Wavefront Sweep: starts right on page load at top-left
+        const maxDiagonal = (width + height) * Math.SQRT1_2;
+        if (!sweepDone) {
+          sweepDist += sweepSpeed * dt;
+          if (sweepDist > maxDiagonal + sweepBand) {
+            sweepDone = true;
+          }
+
+          // Smooth cosine bell-curve wave: all dots in the wavefront illuminate smoothly
+          for (let r = -1; r <= rows; r++) {
+            const y = r * GRID + effectivePanY;
+            for (let c = -1; c <= cols; c++) {
+              const x = c * GRID + effectivePanX;
+              const diagDist = (x + y) * Math.SQRT1_2;
+              const delta = diagDist - sweepDist;
+
+              if (Math.abs(delta) < sweepBand) {
+                // Smooth bell curve envelope
+                const waveIntensity = Math.pow(Math.cos((Math.PI * delta) / (2 * sweepBand)), 2) * 0.65;
+                if (waveIntensity > 0.08) {
+                  const worldCol = gridBaseCol + c;
+                  const worldRow = gridBaseRow + r;
+                  illuminatePoint(worldCol, worldRow, waveIntensity, 0.48);
+                }
+              }
+            }
+          }
+        }
+
+        // 2. Mouse Hover Illumination: smooth, continuous halo under pointer (no streaks)
+        if (mouseActive && mouseX >= 0 && mouseY >= 0 && mouseY <= height) {
+          const hoveredCol = Math.round((mouseX - panX) / GRID);
+          const hoveredRow = Math.round((mouseY - panY) / GRID);
+          const HOVER_RADIUS = 85;
+
+          for (let dc = -3; dc <= 3; dc++) {
+            for (let dr = -3; dr <= 3; dr++) {
+              const dist = Math.hypot(dc * GRID, dr * GRID);
+              if (dist <= HOVER_RADIUS) {
+                const hoverIntensity = Math.pow(1 - dist / HOVER_RADIUS, 1.6) * 0.62;
+                if (hoverIntensity > 0.05) {
+                  illuminatePoint(hoveredCol + dc, hoveredRow + dr, hoverIntensity, 0.95);
+                }
+              }
+            }
+          }
+        }
+
+        // 3. Draw Base Dotted Grid (soft and calm)
+        ctx.fillStyle = dotBg;
+        for (let r = -1; r <= rows; r++) {
+          const y = r * GRID + effectivePanY;
+          for (let c = -1; c <= cols; c++) {
+            const x = c * GRID + effectivePanX;
+            ctx.beginPath();
+            ctx.arc(x, y, 0.95, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // 4. Draw Illuminated Points (Subtle, soft glow with card status colors)
+        for (const [key, pt] of litPoints.entries()) {
+          pt.intensity -= pt.decay * dt;
+
+          if (pt.intensity <= 0.015) {
+            litPoints.delete(key);
+            continue;
+          }
+
+          const x = pt.col * GRID + panX;
+          const y = pt.row * GRID + panY;
+
+          // Frustum culling
+          if (x < -20 || x > width + 20 || y < -20 || y > height + 20) {
+            continue;
+          }
+
+          const currentIntensity = Math.min(1, pt.intensity);
+          const colorDef = statusColors[pt.colorIndex] || statusColors[0];
+
+          // Soft diffuse glow (no sharp sparkle core)
+          const glowRadius = Math.max(5, 13 * currentIntensity);
+          const glow = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+          glow.addColorStop(0, colorDef.glow.replace(/[\d.]+\)$/, `${0.52 * currentIntensity})`));
+          glow.addColorStop(0.55, colorDef.glow.replace(/[\d.]+\)$/, `${0.14 * currentIntensity})`));
+          glow.addColorStop(1, 'rgba(0,0,0,0)');
+
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Soft illuminated dot center
+          ctx.fillStyle = colorDef.core.replace(/[\d.]+\)$/, `${0.65 * currentIntensity})`);
+          ctx.beginPath();
+          ctx.arc(x, y, Math.max(1.0, 1.5 * currentIntensity), 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        animId = requestAnimationFrame(frame);
+      }
+
+      // Initialize bounds and start frame immediately on page load
+      resize();
+      const ro = new ResizeObserver(() => resize());
+      ro.observe(parentZone);
+      if (mmDemo) ro.observe(mmDemo);
+
+      const io = new IntersectionObserver(([entry]) => {
+        isVisible = entry.isIntersecting;
+      }, { threshold: 0.05 });
+      io.observe(container);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          isVisible = false;
+        } else {
+          isVisible = true;
+          lastTime = performance.now();
+        }
+      });
+
+      // Start immediately on page load
+      lastTime = performance.now();
+      animId = requestAnimationFrame(frame);
+    }
+  }
+</script>
+
+<style is:global>
+  .hero-lights-container {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+    /* Soft feathered edges: fades at the top, sides, and seamlessly above the mind map demo */
+    mask-image:
+      linear-gradient(to bottom, transparent 0%, black 30px, black calc(100% - 36px), transparent 100%),
+      linear-gradient(to right, transparent 0%, black 50px, black calc(100% - 50px), transparent 100%);
+    -webkit-mask-image:
+      linear-gradient(to bottom, transparent 0%, black 30px, black calc(100% - 36px), transparent 100%),
+      linear-gradient(to right, transparent 0%, black 50px, black calc(100% - 50px), transparent 100%);
+    mask-composite: intersect;
+    -webkit-mask-composite: source-in;
+  }
+
+  .hero-lights-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+</style>

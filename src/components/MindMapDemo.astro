@@ -1,8 +1,9 @@
 ---
 // "Mind map your project": a patch of the real canvas, as the app draws it (frosted bar on top, minimap bottom left,
-// mic bottom middle, dotted board, fixed-size cards). A sonar dot invites a double-click (double-tap on touch).
+// mic bottom middle, dotted board, fixed-size cards, dependency arrows). A sonar dot invites a double-click (double-tap on touch).
 // The card appears where you click, unfolds into the open card over a dimmed canvas (as in the app: a flight to the
-// middle, then the unfold), its description types in, "Start agent" is pressed, and it folds back into its place, working.
+// middle, then the unfold), its description types in, "Start agent" is pressed, and it folds back into its place, working,
+// with an animated dependency arrow connecting it to the active workflow.
 ---
 <div class="mm" id="mm" role="application" aria-label="Interactive demo: double-click the canvas to create a task card">
   <div class="mm-chrome" aria-hidden="true">
@@ -18,8 +19,38 @@
     <div class="mm-mic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
   </div>
 
-  <div class="mm-card static a hide-s" style="--c:var(--green)"><span class="kind">Task</span><b class="ttl">Round to whole dollars</b><p class="meta">A switch rounds each share up to the dollar.</p><span class="state">Approved</span></div>
-  <div class="mm-card static b hide-s" style="--c:var(--blue)"><span class="kind">Task</span><b class="ttl">Run the tests on every push</b><p class="meta">Writing the workflow.</p><span class="state working">Agent at work<i class="stroke"></i></span></div>
+  <!-- SVG Dependency Arrows -->
+  <svg class="mm-deps" id="mm-deps" aria-hidden="true">
+    <defs>
+      <marker id="mm-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0 1.5L9 5L0 8.5z" fill="var(--green)" />
+      </marker>
+      <marker id="mm-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0 1.5L9 5L0 8.5z" fill="var(--blue)" />
+      </marker>
+    </defs>
+    <!-- Settled line: Round to whole dollars (a) -> Run tests (b) -->
+    <path id="mm-line-ab" class="mm-path done" marker-end="url(#mm-arrow-green)" />
+    <path id="mm-pulse-ab" class="mm-pulse done" />
+    <!-- Dynamic lines to newly created cards -->
+    <g id="mm-dynamic-lines"></g>
+  </svg>
+
+  <div class="mm-card static a hide-s" id="mm-card-a" style="--c:var(--green)">
+    <div class="cs-handles" aria-hidden="true"><span class="cs-dot dot-t"></span><span class="cs-dot dot-r"></span><span class="cs-dot dot-b"></span><span class="cs-dot dot-l"></span></div>
+    <span class="kind">Task</span>
+    <b class="ttl">Round to whole dollars</b>
+    <p class="meta">A switch rounds each share up to the dollar.</p>
+    <span class="state">Approved</span>
+  </div>
+
+  <div class="mm-card static b hide-s" id="mm-card-b" style="--c:var(--blue)">
+    <div class="cs-handles" aria-hidden="true"><span class="cs-dot dot-t"></span><span class="cs-dot dot-r"></span><span class="cs-dot dot-b"></span><span class="cs-dot dot-l"></span></div>
+    <span class="kind">Task</span>
+    <b class="ttl">Run the tests on every push</b>
+    <p class="meta">Writing the workflow.</p>
+    <span class="state working">Agent at work<i class="stroke"></i></span>
+  </div>
 
   <div class="mm-hint" id="mm-hint">
     <span class="sonar"><i></i><i></i><i></i></span>
@@ -46,8 +77,15 @@
   const $ = (id: string) => document.getElementById(id)!;
   const area = $('mm'), hint = $('mm-hint'), dim = $('mm-dim'), panel = $('mm-panel'), pbody = $('mm-pbody'),
     ptitle = $('mm-ptitle'), start = $('mm-start'), map = $('mm-map');
+  const lineAB = $('mm-line-ab') as unknown as SVGPathElement;
+  const pulseAB = $('mm-pulse-ab') as unknown as SVGPathElement;
+  const dynamicLines = $('mm-dynamic-lines');
+  const cardA = $('mm-card-a');
+  const cardB = $('mm-card-b');
+
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const UNFOLD = 300;
+  const HEAD = 10;
 
   const tasks = [
     { t: 'Add dark mode', d: 'Follow the system setting, with a toggle in the top bar.' },
@@ -62,7 +100,10 @@
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, hurry ? 0 : reduce ? Math.min(ms, 150) : ms));
   const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
+  type B = { x: number; y: number; w: number; h: number };
   const rectOf = (el: HTMLElement) => ({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight });
+  const boxOf = (el: HTMLElement): B => ({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+
   const setRect = (r: { left: number; top: number; width: number; height: number }) => {
     panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px'; panel.style.width = r.width + 'px'; panel.style.height = r.height + 'px';
   };
@@ -70,6 +111,31 @@
     const W = area.clientWidth, H = area.clientHeight, w = Math.min(600, W - 24), h = Math.min(380, H - 100);
     return { left: (W - w) / 2, top: Math.max(66, (H - h) / 2 + 24), width: w, height: h };
   };
+
+  function path(a: B, b: B): string {
+    const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w)), gapY = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+    const across = gapX > gapY;
+    const dir = (across ? Math.sign(b.x + b.w / 2 - (a.x + a.w / 2)) : Math.sign(b.y + b.h / 2 - (a.y + a.h / 2))) || 1;
+    const [x1, y1] = across ? [dir > 0 ? a.x + a.w : a.x, a.y + a.h / 2] : [a.x + a.w / 2, dir > 0 ? a.y + a.h : a.y];
+    const [x2, y2] = across ? [(dir > 0 ? b.x : b.x + b.w) - dir * HEAD, b.y + b.h / 2] : [b.x + b.w / 2, (dir > 0 ? b.y : b.y + b.h) - dir * HEAD];
+    const along = across ? x2 - x1 : y2 - y1, aside = across ? y2 - y1 : x2 - x1;
+    const reach = dir * Math.max((dir * along) / 2, Math.min(Math.abs(aside) / 2, HEAD));
+    const [c1x, c1y, c2x, c2y] = across ? [x1 + reach, y1, x2 - reach, y2] : [x1, y1 + reach, x2, y2 - reach];
+    return `M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`;
+  }
+
+  function updateStaticArrow() {
+    if (!cardA || !cardB || !lineAB || window.innerWidth < 760) {
+      if (lineAB) lineAB.style.display = 'none';
+      if (pulseAB) pulseAB.style.display = 'none';
+      return;
+    }
+    lineAB.style.display = '';
+    if (pulseAB) pulseAB.style.display = '';
+    const d = path(boxOf(cardA), boxOf(cardB));
+    lineAB.setAttribute('d', d);
+    if (pulseAB) pulseAB.setAttribute('d', d);
+  }
 
   function drawMap() {
     map.innerHTML = '';
@@ -79,6 +145,43 @@
       s.style.cssText = `left:${(c.offsetLeft / W) * 100}%;top:${(c.offsetTop / H) * 100}%;width:${(c.offsetWidth / W) * 100}%;height:${(c.offsetHeight / H) * 100}%;background:${c.classList.contains('working') ? 'var(--blue)' : c.classList.contains('static') ? (c.style.getPropertyValue('--c') || 'var(--muted)') : 'var(--muted)'}`;
       map.appendChild(s);
     }
+    updateStaticArrow();
+  }
+
+  interface CreatedEdge {
+    from: HTMLElement;
+    to: HTMLElement;
+    p: SVGPathElement;
+    pulse: SVGPathElement;
+  }
+  const createdEdges: CreatedEdge[] = [];
+
+  function addArrow(fromEl: HTMLElement, toEl: HTMLElement) {
+    if (!dynamicLines) return;
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('class', 'mm-path active');
+    p.setAttribute('marker-end', 'url(#mm-arrow-blue)');
+
+    const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    pulse.setAttribute('class', 'mm-pulse blue');
+
+    const d = path(boxOf(fromEl), boxOf(toEl));
+    p.setAttribute('d', d);
+    pulse.setAttribute('d', d);
+
+    // Animate drawing stroke
+    const len = 400;
+    p.style.strokeDasharray = `${len}`;
+    p.style.strokeDashoffset = `${len}`;
+    p.style.transition = 'stroke-dashoffset 0.6s cubic-bezier(0.2, 0.9, 0.3, 1)';
+
+    dynamicLines.appendChild(p);
+    dynamicLines.appendChild(pulse);
+    createdEdges.push({ from: fromEl, to: toEl, p, pulse });
+
+    requestAnimationFrame(() => {
+      p.style.strokeDashoffset = '0';
+    });
   }
 
   async function create(clientX: number, clientY: number) {
@@ -88,22 +191,27 @@
     const r = area.getBoundingClientRect();
     hint.classList.add('done');
 
-    // the card, where it was made (cards have one fixed size; the bar and the foot stay clear)
+    // the card, where it was made
     const el = document.createElement('div');
     el.className = 'mm-card fresh';
     el.style.setProperty('--c', 'var(--muted)');
-    el.innerHTML = '<span class="kind">Task</span><b class="ttl untitled">New task</b><p class="meta"></p><span class="state">Planned</span>';
+    el.innerHTML = '<div class="cs-handles" aria-hidden="true"><span class="cs-dot dot-t"></span><span class="cs-dot dot-r"></span><span class="cs-dot dot-b"></span><span class="cs-dot dot-l"></span></div><span class="kind">Task</span><b class="ttl untitled">New task</b><p class="meta"></p><span class="state">Planned</span>';
     area.appendChild(el);
     const w = el.offsetWidth, h = el.offsetHeight;
     el.style.left = Math.max(12, Math.min(clientX - r.left - w / 2, area.clientWidth - w - 12)) + 'px';
     el.style.top = Math.max(70, Math.min(clientY - r.top - h / 2, area.clientHeight - h - 12)) + 'px';
     cards.push(el);
-    if (cards.length > 5) { const old = cards.shift()!; old.classList.add('gone'); setTimeout(() => { old.remove(); drawMap(); }, 300); }
+
+    if (cards.length > 5) {
+      const old = cards.shift()!;
+      old.classList.add('gone');
+      setTimeout(() => { old.remove(); drawMap(); }, 300);
+    }
     drawMap();
     const ttl = el.querySelector<HTMLElement>('.ttl')!, meta = el.querySelector<HTMLElement>('.meta')!, state = el.querySelector<HTMLElement>('.state')!;
     await sleep(380);
 
-    // unfold: from the card's rect to the open card's, over the dimmed canvas
+    // unfold: from the card's rect to the open card's
     ptitle.innerHTML = '<span class="ph">What is it about?</span>';
     pbody.innerHTML = '<span class="ph">Description</span><span class="caret"></span>';
     start.classList.remove('pressed', 'beckon');
@@ -119,7 +227,7 @@
     await sleep(UNFOLD);
     panel.classList.add('ready');
 
-    // the description types itself in, the cursor in the field
+    // the description types itself in
     await sleep(250);
     pbody.innerHTML = '<span class="txt"></span><span class="caret"></span>';
     const txt = pbody.querySelector<HTMLElement>('.txt')!;
@@ -128,8 +236,7 @@
     txt.textContent = task.d;
     await sleep(550);
 
-    // the user starts it: "Start agent" waits for a click, a sonar on it asking for one.
-    // Closing instead (×, the dim, Esc) folds the card back as it is, planned.
+    // user decision
     hurry = false;
     let choice: 'start' | 'close' = 'close';
     if (!closeReq) {
@@ -147,19 +254,27 @@
     panel.classList.remove('on', 'anim'); panel.setAttribute('aria-hidden', 'true');
     meta.textContent = task.d;
     el.classList.remove('fresh');
+
     if (choice === 'start') {
       ttl.textContent = task.t; ttl.classList.remove('untitled');
       el.classList.add('working');
       el.style.setProperty('--c', 'var(--blue)');
       state.className = 'state working'; state.innerHTML = 'Agent at work<i class="stroke"></i>';
+
+      // Connect to the previous card or card B with a flowing arrow!
+      const parentCard = cards.length > 1 ? cards[cards.length - 2] : cardB;
+      if (parentCard) {
+        addArrow(parentCard, el);
+      }
     }
+
     drawMap();
     busy = false;
   }
 
   const inCanvas = (t: EventTarget | null) => !(t as HTMLElement).closest('.mm-chrome, .mm-card, .mm-panel, .mm-dim');
   area.addEventListener('dblclick', (e) => { if (inCanvas(e.target)) create(e.clientX, e.clientY); });
-  // touch screens: two quick taps close together (dblclick is unreliable there)
+
   let last = { t: 0, x: 0, y: 0 };
   area.addEventListener('pointerup', (e) => {
     if (e.pointerType !== 'touch' || !inCanvas(e.target)) return;
@@ -167,7 +282,7 @@
     last = { t: e.timeStamp, x: e.clientX, y: e.clientY };
     if (quick) { last.t = 0; create(e.clientX, e.clientY); }
   });
-  // closing early (dim, ×, Esc) skips the typing and folds the card back
+
   const hurryUp = () => { if (!busy) return; hurry = true; closeReq = true; decide?.('close'); };
   start.addEventListener('click', () => { if (decide) decide('start'); });
   dim.addEventListener('click', hurryUp);
@@ -183,7 +298,62 @@
     background-color: color-mix(in srgb, var(--bg) 60%, transparent);
     background-image: radial-gradient(var(--dot) 1.2px, transparent 1.4px); background-size: 22px 22px; }
 
-  /* the app's chrome, drawn small: frosted bar, minimap, microphone */
+  /* SVG Arrows */
+  .mm-deps {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .mm-path {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.8;
+  }
+
+  .mm-path.done {
+    stroke: var(--green);
+    opacity: 0.65;
+  }
+
+  .mm-path.active {
+    stroke: var(--blue);
+    stroke-width: 2.2;
+    filter: drop-shadow(0 0 5px rgba(47, 111, 232, 0.4));
+  }
+
+  .mm-pulse {
+    fill: none;
+    stroke-linecap: round;
+    stroke-dasharray: 10 140;
+    stroke-dashoffset: 0;
+    animation: mmFlow 2.5s linear infinite;
+    pointer-events: none;
+  }
+
+  .mm-pulse.done {
+    stroke: #ffffff;
+    stroke-width: 2.5;
+    filter: drop-shadow(0 0 5px var(--green));
+  }
+
+  .mm-pulse.blue {
+    stroke: #ffffff;
+    stroke-width: 3.2;
+    filter: drop-shadow(0 0 6px var(--blue));
+    animation-duration: 1.8s;
+  }
+
+  @keyframes mmFlow {
+    from { stroke-dashoffset: 150; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* chrome */
   .mm-chrome { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
   .mm-bar { position: absolute; left: 0; right: 0; top: 0; height: 54px; display: flex; align-items: center; gap: 8px; padding: 0 12px;
     background: color-mix(in srgb, var(--bg) 45%, transparent); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6); }
@@ -199,8 +369,8 @@
   .mm-mic { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
     background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--shadow); }
 
-  /* cards: one fixed size, kind, title, text, the state at the foot with the moving line while an agent works */
-  .mm-card { --cw: 280px; --ch: 132px; position: absolute; z-index: 1; width: var(--cw); height: var(--ch); padding: 14px 15px 12px; border-radius: 14px;
+  /* cards */
+  .mm-card { --cw: 280px; --ch: 132px; position: absolute; z-index: 2; width: var(--cw); height: var(--ch); padding: 14px 15px 12px; border-radius: 14px;
     background: var(--card); border: 1px solid var(--glass-edge); backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5);
     box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow); cursor: default; transition: opacity .3s, transform .2s, box-shadow .2s; }
   .mm-card.fresh { animation: mm-pop .28s cubic-bezier(.2, 1.3, .4, 1); }
@@ -218,7 +388,7 @@
   @keyframes mm-run { from { left: 0; } to { left: 22px; } }
   @keyframes mm-pop { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
 
-  /* the sonar: where to double-click */
+  /* sonar */
   .mm-hint { position: absolute; z-index: 1; left: 50%; top: 52%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 20px; pointer-events: none; transition: opacity .4s; }
   .mm-hint.done { opacity: 0; }
   .sonar { position: relative; width: 14px; height: 14px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 12px var(--blue); }
@@ -229,7 +399,7 @@
   .mm .touch { display: none; }
   @media (pointer: coarse) { .mm .pc { display: none; } .mm .touch { display: inline; } }
 
-  /* the open card, as the app unfolds it: dimmed canvas, a panel with the state's tab, title, state, description, Start agent */
+  /* open panel */
   .mm-dim { position: absolute; inset: 0; z-index: 4; background: var(--dim); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .2s; }
   .mm-dim.on { opacity: 1; pointer-events: auto; cursor: default; }
   .mm-panel { position: absolute; z-index: 5; display: none; overflow: hidden; border-radius: 14px; background: var(--panel); border: 1px solid var(--glass-edge);
@@ -262,5 +432,5 @@
   @media (max-width: 760px) { .mm .hide-s { display: none !important; } }
   @media (max-width: 640px) { .mm { height: 480px; } .mm-card { --cw: 232px; --ch: 124px; } .mm-map { display: none; } .mm-panel .inner { padding: 22px 20px; } .mm-panel .p-title { font-size: 24px; } }
   @media (prefers-reduced-motion: reduce) { .sonar i { animation: none; opacity: .4; transform: scale(2.5); } .mm-card, .mm-card.fresh, .mm-panel.anim, .mm-dim, .mm-panel .inner { animation: none; transition: none; }
-    .mm-card .stroke::after, .mm-panel .caret { animation: none; } }
+    .mm-card .stroke::after, .mm-panel .caret { animation: none; } .mm-pulse { animation: none; } }
 </style>
