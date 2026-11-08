@@ -1,0 +1,990 @@
+---
+// "HeroFlowShowcase": Fast, free-forming spatial canvas animation.
+// Completely unboxed — no screenshot frame, no mock chrome.
+// Cards and dependency arrows free-form directly in open space below the hero buttons:
+// 1. Zoomed in: Task 1 pops up large.
+// 2. Rapid zoom out: arrow grows out to Card 2, with status chips auto-assigned.
+// 3. Fast zoom out: center arrow grows from Card 2 and branches into 3 arrows flowing right.
+// 4. Each arrow connects to a newly created card.
+// 5. Bottom card draws a dotted curve rounding downward to an "AI suggested follow up" with the Seismic sparkle.
+// 6. Top & middle cards branch out to Review and Demo cards.
+// 7. At random intervals, little glowing dots fly through the arrows from one card to another.
+---
+<div class="flow-free-stage" id="flow-showcase" role="region" aria-label="Free-forming animation of Seismic autonomous agent orchestration">
+  <div class="flow-stage-controls" aria-hidden="true">
+    <button class="flow-replay-pill" id="flow-replay-btn" type="button" title="Replay orchestration flow">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+      </svg>
+      Replay flow
+    </button>
+  </div>
+
+  <div class="flow-free-viewport" id="flow-viewport">
+    <div class="flow-free-world" id="flow-world">
+      <!-- SVG Dependency Arrows and Flying Dots -->
+      <svg class="flow-svg" id="flow-svg" width="1300" height="660" aria-hidden="true">
+        <defs id="flow-defs">
+          <marker id="f-arrow-blue" viewBox="0 0 9 8" refX="0.5" refY="4" markerWidth="8.5" markerHeight="7.6" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0.8 L8.5,4 L0,7.2 z" fill="var(--blue)" />
+          </marker>
+          <marker id="f-arrow-amber" viewBox="0 0 9 8" refX="0.5" refY="4" markerWidth="8.5" markerHeight="7.6" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0.8 L8.5,4 L0,7.2 z" fill="var(--amber)" />
+          </marker>
+          <marker id="f-arrow-purple" viewBox="0 0 9 8" refX="0.5" refY="4" markerWidth="8.5" markerHeight="7.6" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0.8 L8.5,4 L0,7.2 z" fill="var(--purple)" />
+          </marker>
+          <marker id="f-arrow-teal" viewBox="0 0 9 8" refX="0.5" refY="4" markerWidth="8.5" markerHeight="7.6" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0.8 L8.5,4 L0,7.2 z" fill="var(--teal)" />
+          </marker>
+          <marker id="f-arrow-green" viewBox="0 0 9 8" refX="0.5" refY="4" markerWidth="8.5" markerHeight="7.6" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0.8 L8.5,4 L0,7.2 z" fill="var(--green)" />
+          </marker>
+        </defs>
+
+        <g id="flow-base-lines"></g>
+        <g id="flow-dots"></g>
+      </svg>
+
+      <!-- FREE FORMING CARDS -->
+      <!-- Card 1: Task 1 (Zoomed In Initially) -->
+      <div class="flow-card c1" id="flow-c1" style="left:50px;top:220px;--c:var(--muted)">
+        <div class="card-handles"><span class="h-dot"></span><span class="h-dot"></span></div>
+        <div class="f-kind"><span class="k-label">Task</span><span class="repo-tag">seismic/core</span></div>
+        <div class="f-title">Task 1</div>
+        <div class="f-meta">Initialize orchestrator pipeline</div>
+        <div class="f-state"><span class="dotm">●</span> Planned</div>
+      </div>
+
+      <!-- Card 2: Task 2 (Status Chips Auto-assigned) -->
+      <div class="flow-card c2" id="flow-c2" style="left:340px;top:220px;--c:var(--blue)">
+        <div class="card-handles"><span class="h-dot"></span><span class="h-dot"></span></div>
+        <div class="f-kind">
+          <span class="k-label">Task</span>
+          <div class="f-chips" id="flow-c2-chips">
+            <span class="lchip sugg">⚡ High</span>
+            <span class="lchip sugg">✦ AI Orchestrated</span>
+          </div>
+        </div>
+        <div class="f-title">Task 2</div>
+        <div class="f-meta">Decompose feature graph into workers</div>
+        <div class="f-state working">Agent at work<i class="stroke"></i></div>
+      </div>
+
+      <!-- Card 3A (Top Branch) -->
+      <div class="flow-card c3a" id="flow-c3a" style="left:680px;top:60px;--c:var(--blue)">
+        <div class="card-handles"><span class="h-dot"></span><span class="h-dot"></span></div>
+        <div class="f-kind"><span class="k-label">Task · seismic/auth</span><span class="lchip">Worker Alpha</span></div>
+        <div class="f-title">Task 3A: Auth Worktree</div>
+        <div class="f-meta">Parallel worktree feature clone</div>
+        <div class="f-state working">Agent at work<i class="stroke"></i></div>
+      </div>
+
+      <!-- Card 3B (Middle Branch) -->
+      <div class="flow-card c3b" id="flow-c3b" style="left:680px;top:220px;--c:var(--blue)">
+        <div class="card-handles"><span class="h-dot"></span><span class="h-dot"></span></div>
+        <div class="f-kind"><span class="k-label">Task · seismic/api</span><span class="lchip">Worker Beta</span></div>
+        <div class="f-title">Task 3B: Pipeline Sync</div>
+        <div class="f-meta">Resolving cross-worker merge contracts</div>
+        <div class="f-state working">Agent at work<i class="stroke"></i></div>
+      </div>
+
+      <!-- Card 3C (Bottom Branch) -->
+      <div class="flow-card c3c" id="flow-c3c" style="left:680px;top:380px;--c:var(--amber)">
+        <div class="card-handles"><span class="h-dot"></span><span class="h-dot"></span></div>
+        <div class="f-kind"><span class="k-label">Task · seismic/db</span><span class="lchip">Worker Gamma</span></div>
+        <div class="f-title">Task 3C: Schema Migration</div>
+        <div class="f-meta">Validating migration rollback steps</div>
+        <div class="f-state" style="color:var(--amber)">● Needs you · demo ready</div>
+      </div>
+
+      <!-- AI Suggested Follow-up Card (Rounded Dotted Connection from Bottom Card) -->
+      <div class="flow-card c-sugg" id="flow-c-sugg" style="left:680px;top:535px;--c:var(--purple)">
+        <div class="card-handles"><span class="h-dot"></span></div>
+        <div class="f-kind">
+          <span class="k-label sugg-head">
+            <svg class="sparkle-svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+              <path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" />
+            </svg>
+            AI suggested follow up
+          </span>
+          <span class="repo-tag">seismic/db</span>
+        </div>
+        <div class="f-title">Health Check & Rollback Tests</div>
+        <div class="f-meta">Synthesized from migration analysis</div>
+        <div class="f-state" style="color:var(--purple)"><span class="dotm">●</span> Ready to queue</div>
+      </div>
+
+      <!-- Card 4A (Downstream from Top Card 3A) -->
+      <div class="flow-card c4a" id="flow-c4a" style="left:1000px;top:60px;--c:var(--teal)">
+        <div class="card-handles"><span class="h-dot"></span></div>
+        <div class="f-kind"><span class="k-label">Review · Claude Opus</span></div>
+        <div class="f-title">Adversarial Code Review</div>
+        <div class="f-meta">Reviewing against repository rules</div>
+        <div class="f-state" style="color:var(--teal)">● 4 findings checked</div>
+      </div>
+
+      <!-- Card 4B (Downstream from Middle Card 3B) -->
+      <div class="flow-card c4b" id="flow-c4b" style="left:1000px;top:220px;--c:var(--green)">
+        <div class="card-handles"><span class="h-dot"></span></div>
+        <div class="f-kind"><span class="k-label">Demo · 0:24</span></div>
+        <div class="f-title">Video Demo Recording</div>
+        <div class="f-meta">Browser demo recorded for approval</div>
+        <div class="f-state" style="color:var(--green)">● Demo ready</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  interface Bounds {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  }
+
+  interface ActiveArrow {
+    path: SVGPathElement;
+    color: string;
+    sourceCard: HTMLElement;
+    targetCard: HTMLElement;
+  }
+
+  const container = document.getElementById('flow-showcase')!;
+  const viewport = document.getElementById('flow-viewport')!;
+  const world = document.getElementById('flow-world')!;
+  const baseLines = document.getElementById('flow-base-lines')!;
+  const dotsLayer = document.getElementById('flow-dots')!;
+  const svgDefs = document.getElementById('flow-defs')!;
+  const replayBtn = document.getElementById('flow-replay-btn')!;
+
+  const c1 = document.getElementById('flow-c1')!;
+  const c2 = document.getElementById('flow-c2')!;
+  const c2Chips = document.getElementById('flow-c2-chips')!;
+  const c3a = document.getElementById('flow-c3a')!;
+  const c3b = document.getElementById('flow-c3b')!;
+  const c3c = document.getElementById('flow-c3c')!;
+  const cSugg = document.getElementById('flow-c-sugg')!;
+  const c4a = document.getElementById('flow-c4a')!;
+  const c4b = document.getElementById('flow-c4b')!;
+
+  const allCards = [c1, c2, c3a, c3b, c3c, cSugg, c4a, c4b];
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let hasTriggered = false;
+  let runningAnimation = false;
+  let timeouts: number[] = [];
+  let activeRafIds: number[] = [];
+  let activeArrows: ActiveArrow[] = [];
+  let dotLoopTimeout: number | null = null;
+
+  function clearTimeouts() {
+    timeouts.forEach((t) => clearTimeout(t));
+    timeouts = [];
+    if (dotLoopTimeout !== null) {
+      clearTimeout(dotLoopTimeout);
+      dotLoopTimeout = null;
+    }
+  }
+
+  function stopAllRafs() {
+    activeRafIds.forEach((id) => cancelAnimationFrame(id));
+    activeRafIds = [];
+  }
+
+  function wait(ms: number): Promise<void> {
+    return new Promise((res) => {
+      const id = window.setTimeout(res, reduceMotion ? Math.min(ms, 40) : ms);
+      timeouts.push(id);
+    });
+  }
+
+  const box = (el: HTMLElement): Bounds => ({
+    x: el.offsetLeft,
+    y: el.offsetTop,
+    w: el.offsetWidth,
+    h: el.offsetHeight,
+  });
+
+  // Obeya link curve
+  function linkCurve(a: Bounds, b: Bounds, head = 8): string {
+    const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
+    const gapY = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+    const across = gapX > gapY;
+    const dir = (across ? Math.sign(b.x + b.w / 2 - (a.x + a.w / 2)) : Math.sign(b.y + b.h / 2 - (a.y + a.h / 2))) || 1;
+    const [x1, y1] = across ? [dir > 0 ? a.x + a.w : a.x, a.y + a.h / 2] : [a.x + a.w / 2, dir > 0 ? a.y + a.h : a.y];
+    const [x2, y2] = across ? [(dir > 0 ? b.x : b.x + b.w) - dir * head, b.y + b.h / 2] : [b.x + b.w / 2, (dir > 0 ? b.y : b.y + b.h) - dir * head];
+    const along = across ? x2 - x1 : y2 - y1;
+    const aside = across ? y2 - y1 : x2 - x1;
+    const reach = dir * Math.max((dir * along) / 2, Math.min(Math.abs(aside) / 2, head));
+    const [c1x, c1y, c2x, c2y] = across ? [x1 + reach, y1, x2 - reach, y2] : [x1, y1 + reach, x2, y2 - reach];
+    return `M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`;
+  }
+
+  // Fast camera control
+  function setCamera(cx: number, cy: number, scale: number, durationMs = 380) {
+    if (reduceMotion) durationMs = 0;
+    const vW = viewport.clientWidth;
+    const vH = viewport.clientHeight;
+
+    const targetX = vW / 2 - cx * scale;
+    const targetY = vH / 2 - cy * scale;
+
+    world.style.transition = durationMs > 0 ? `transform ${durationMs}ms cubic-bezier(0.2, 0.9, 0.3, 1)` : 'none';
+    world.style.transform = `translate(${targetX}px, ${targetY}px) scale(${scale})`;
+  }
+
+  /**
+   * Creates an arrow that visibly GROWS / WIPES from start to finish.
+   * - Uses stroke-dashoffset wiping for solid lines.
+   * - Uses an SVG userSpaceOnUse mask for dotted lines so the dots unroll smoothly.
+   * - The arrowhead marker snaps into place right as the stroke hits the destination card.
+   */
+  function createGrowingArrow(
+    dPath: string,
+    markerId: string,
+    cls: string,
+    dotColor: string,
+    sourceCard: HTMLElement,
+    targetCard: HTMLElement,
+    duration = 280
+  ): Promise<SVGPathElement> {
+    return new Promise((resolve) => {
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', dPath);
+      p.setAttribute('class', cls);
+      baseLines.appendChild(p);
+
+      const isDotted = cls.includes('dotted');
+      const totalLen = Math.ceil(p.getTotalLength()) || 180;
+
+      if (reduceMotion || duration <= 0) {
+        p.setAttribute('marker-end', `url(#${markerId})`);
+        activeArrows.push({ path: p, color: dotColor, sourceCard, targetCard });
+        resolve(p);
+        return;
+      }
+
+      if (isDotted) {
+        // DOTTED WIPE: SVG mask revealing the dotted line from start to finish
+        const maskId = 'fmask-' + Math.random().toString(36).slice(2, 9);
+        const mask = document.createElementNS('http://www.w3.org/2000/svg', 'mask');
+        mask.id = maskId;
+        mask.setAttribute('maskUnits', 'userSpaceOnUse');
+        mask.setAttribute('maskContentUnits', 'userSpaceOnUse');
+        mask.setAttribute('x', '0');
+        mask.setAttribute('y', '0');
+        mask.setAttribute('width', '1300');
+        mask.setAttribute('height', '700');
+
+        const maskPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        maskPath.setAttribute('d', dPath);
+        maskPath.setAttribute('stroke', '#ffffff');
+        maskPath.setAttribute('stroke-width', '24');
+        maskPath.setAttribute('stroke-linecap', 'round');
+        maskPath.setAttribute('fill', 'none');
+        maskPath.style.strokeDasharray = `${totalLen} ${totalLen}`;
+        maskPath.style.strokeDashoffset = `${totalLen}`;
+
+        mask.appendChild(maskPath);
+        svgDefs.appendChild(mask);
+        p.setAttribute('mask', `url(#${maskId})`);
+
+        const anim = maskPath.animate(
+          [
+            { strokeDashoffset: `${totalLen}px` },
+            { strokeDashoffset: '0px' }
+          ],
+          {
+            duration,
+            easing: 'cubic-bezier(0.2, 0.85, 0.3, 1)',
+            fill: 'forwards'
+          }
+        );
+
+        anim.onfinish = () => {
+          p.removeAttribute('mask');
+          mask.remove();
+          p.setAttribute('marker-end', `url(#${markerId})`);
+          activeArrows.push({ path: p, color: dotColor, sourceCard, targetCard });
+          resolve(p);
+        };
+      } else {
+        // SOLID WIPE: standard stroke-dashoffset growth
+        p.style.strokeDasharray = `${totalLen} ${totalLen}`;
+        p.style.strokeDashoffset = `${totalLen}`;
+
+        const anim = p.animate(
+          [
+            { strokeDashoffset: `${totalLen}px` },
+            { strokeDashoffset: '0px' }
+          ],
+          {
+            duration,
+            easing: 'cubic-bezier(0.2, 0.85, 0.3, 1)',
+            fill: 'forwards'
+          }
+        );
+
+        anim.onfinish = () => {
+          p.style.strokeDashoffset = '0';
+          p.setAttribute('marker-end', `url(#${markerId})`);
+          activeArrows.push({ path: p, color: dotColor, sourceCard, targetCard });
+          resolve(p);
+        };
+      }
+    });
+  }
+
+  /**
+   * Spawns a soft luminous glowing dot that flies smoothly through an arrow from one card to another.
+   */
+  function spawnFlyingDot(arrow: ActiveArrow, durationMs = 600) {
+    if (reduceMotion) return;
+    const path = arrow.path;
+    const totalLen = path.getTotalLength();
+    if (totalLen <= 0) return;
+
+    const dotGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    dotGroup.setAttribute('class', 'flow-travel-dot');
+    dotGroup.style.setProperty('--dot-color', arrow.color);
+
+    // Outer soft glow aura
+    const aura = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    aura.setAttribute('r', '7');
+    aura.setAttribute('class', 'dot-aura');
+
+    // Mid vibrant halo
+    const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    halo.setAttribute('r', '4');
+    halo.setAttribute('class', 'dot-halo');
+
+    // Bright white core
+    const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    core.setAttribute('r', '2.2');
+    core.setAttribute('class', 'dot-core');
+
+    dotGroup.appendChild(aura);
+    dotGroup.appendChild(halo);
+    dotGroup.appendChild(core);
+
+    dotsLayer.appendChild(dotGroup);
+
+    const startPt = path.getPointAtLength(0);
+    dotGroup.setAttribute('transform', `translate(${startPt.x}, ${startPt.y})`);
+
+    let startTime: number | null = null;
+    let rafId: number;
+
+    function step(now: number) {
+      if (!startTime) startTime = now;
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+
+      // Smooth easeInOutQuad easing
+      const t = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      const pt = path.getPointAtLength(t * totalLen);
+
+      dotGroup.setAttribute('transform', `translate(${pt.x}, ${pt.y})`);
+
+      // Gentle fade in at start, soft fade out as it enters target card
+      if (progress < 0.15) {
+        dotGroup.style.opacity = String(progress / 0.15);
+      } else if (progress > 0.85) {
+        dotGroup.style.opacity = String((1 - progress) / 0.15);
+      } else {
+        dotGroup.style.opacity = '1';
+      }
+
+      // Subtle pulse on the destination card when dot arrives
+      if (progress > 0.88 && arrow.targetCard && !arrow.targetCard.classList.contains('glow-hit')) {
+        arrow.targetCard.classList.add('glow-hit');
+        window.setTimeout(() => {
+          arrow.targetCard.classList.remove('glow-hit');
+        }, 320);
+      }
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(step);
+        activeRafIds.push(rafId);
+      } else {
+        dotGroup.remove();
+      }
+    }
+
+    rafId = requestAnimationFrame(step);
+    activeRafIds.push(rafId);
+  }
+
+  /**
+   * Starts random interval loop sending glowing dots along established arrows.
+   */
+  function startDotLoop() {
+    stopDotLoop();
+    if (reduceMotion) return;
+
+    function next() {
+      // Random interval between 1.6s and 3.6s
+      const delay = 1600 + Math.random() * 2000;
+      dotLoopTimeout = window.setTimeout(() => {
+        if (!runningAnimation && hasTriggered && activeArrows.length > 0) {
+          // Select random active arrow
+          const arrow = activeArrows[Math.floor(Math.random() * activeArrows.length)];
+          const len = arrow.path.getTotalLength();
+          const flightMs = Math.max(480, Math.min(780, len * 3.2));
+          spawnFlyingDot(arrow, flightMs);
+
+          // 25% chance of a staggered secondary dot on another branch
+          if (Math.random() < 0.25 && activeArrows.length > 1) {
+            window.setTimeout(() => {
+              if (runningAnimation || !hasTriggered) return;
+              const others = activeArrows.filter((a) => a !== arrow);
+              const secondArrow = others[Math.floor(Math.random() * others.length)];
+              const secondLen = secondArrow.path.getTotalLength();
+              spawnFlyingDot(secondArrow, Math.max(480, Math.min(780, secondLen * 3.2)));
+            }, 180);
+          }
+        }
+        next();
+      }, delay);
+    }
+
+    // First glowing dot glides gently across Arrow 1->2 400ms after choreography settles
+    const firstId = window.setTimeout(() => {
+      if (!runningAnimation && hasTriggered && activeArrows.length > 0) {
+        spawnFlyingDot(activeArrows[0], 520);
+      }
+      next();
+    }, 400);
+    timeouts.push(firstId);
+  }
+
+  function stopDotLoop() {
+    if (dotLoopTimeout !== null) {
+      clearTimeout(dotLoopTimeout);
+      dotLoopTimeout = null;
+    }
+  }
+
+  function resetAll() {
+    clearTimeouts();
+    stopAllRafs();
+    stopDotLoop();
+
+    baseLines.innerHTML = '';
+    dotsLayer.innerHTML = '';
+    activeArrows = [];
+
+    // Remove any orphan masks
+    svgDefs.querySelectorAll('mask').forEach((m) => m.remove());
+
+    allCards.forEach((c) => {
+      c.classList.remove('visible', 'pop', 'glow-hit');
+      c.style.opacity = '0';
+      c.style.transform = 'scale(0.85)';
+      c.style.boxShadow = '';
+    });
+
+    c2Chips.classList.remove('visible');
+    world.style.transition = 'none';
+  }
+
+  function popCard(el: HTMLElement) {
+    if (!runningAnimation && !hasTriggered) return;
+    el.classList.add('visible', 'pop');
+    el.style.opacity = '1';
+    el.style.transform = 'scale(1)';
+  }
+
+  // FAST FREE-FORMING ORCHESTRATION CHOREOGRAPHY WITH STAGGERED GROWING ARROWS (~2.3s)
+  async function runFastOrchestration() {
+    if (runningAnimation) return;
+    runningAnimation = true;
+    resetAll();
+
+    // -------------------------------------------------------------
+    // PHASE 1 (0ms): Zoomed in: Task 1 pops up large
+    // -------------------------------------------------------------
+    setCamera(160, 275, 1.35, 0);
+
+    await wait(60);
+    popCard(c1);
+
+    await wait(280);
+
+    // -------------------------------------------------------------
+    // PHASE 2 (340ms): Rapid zoom out, arrow grows to Card 2, status chips auto-assigned
+    // -------------------------------------------------------------
+    setCamera(320, 275, 1.05, 360);
+
+    await wait(70);
+    const path12 = linkCurve(box(c1), box(c2));
+    // Arrow physically wipes across the gap and docks into Card 2
+    await createGrowingArrow(path12, 'f-arrow-blue', 'flow-arrow', 'var(--blue)', c1, c2, 260);
+    popCard(c2);
+
+    await wait(120);
+    c2Chips.classList.add('visible');
+
+    await wait(300);
+
+    // -------------------------------------------------------------
+    // PHASE 3 & 4 (1090ms): Zoom out, 3 arrows branch with natural STAGGER
+    // Center arrow starts first, then top, then bottom
+    // Cards pop in organically as each individual arrow arrives
+    // -------------------------------------------------------------
+    setCamera(590, 290, 0.82, 380);
+
+    await wait(70);
+    const b2 = box(c2);
+    const b3a = box(c3a);
+    const b3b = box(c3b);
+    const b3c = box(c3c);
+
+    const startX = b2.x + b2.w;
+    const startY = b2.y + b2.h / 2;
+
+    const targetA_X = b3a.x - 8;
+    const targetA_Y = b3a.y + b3a.h / 2;
+
+    const targetB_X = b3b.x - 8;
+    const targetB_Y = b3b.y + b3b.h / 2;
+
+    const targetC_X = b3c.x - 8;
+    const targetC_Y = b3c.y + b3c.h / 2;
+
+    const junctionX = startX + (targetB_X - startX) * 0.44;
+
+    const pathTop = `M${startX},${startY} C${junctionX},${startY} ${junctionX - 10},${targetA_Y} ${targetA_X},${targetA_Y}`;
+    const pathMid = `M${startX},${startY} L${targetB_X},${targetB_Y}`;
+    const pathBtm = `M${startX},${startY} C${junctionX},${startY} ${junctionX - 10},${targetC_Y} ${targetC_X},${targetC_Y}`;
+
+    // STAGGERED BRANCH 1: Center worker (3B) starts immediately
+    const arrowMid = createGrowingArrow(pathMid, 'f-arrow-blue', 'flow-arrow', 'var(--blue)', c2, c3b, 270).then(() => {
+      popCard(c3b);
+    });
+
+    // STAGGERED BRANCH 2: Top worker (3A) branches 65ms later
+    await wait(65);
+    const arrowTop = createGrowingArrow(pathTop, 'f-arrow-blue', 'flow-arrow', 'var(--blue)', c2, c3a, 290).then(() => {
+      popCard(c3a);
+    });
+
+    // STAGGERED BRANCH 3: Bottom worker (3C) branches 75ms later
+    await wait(75);
+    const arrowBtm = createGrowingArrow(pathBtm, 'f-arrow-amber', 'flow-arrow amber', 'var(--amber)', c2, c3c, 290).then(() => {
+      popCard(c3c);
+    });
+
+    await Promise.all([arrowMid, arrowTop, arrowBtm]);
+    await wait(260);
+
+    // -------------------------------------------------------------
+    // PHASE 5 (1840ms): Zoom out to full graph
+    // Downstream branches start with natural STAGGER:
+    // Schema follow-up unrolls downward first, then code review, then video demo
+    // -------------------------------------------------------------
+    setCamera(660, 310, 0.72, 380);
+
+    await wait(70);
+
+    // Dotted curve rounding downward from Bottom Card (c3c) to cSugg
+    const bSugg = box(cSugg);
+    const ptStartX = b3c.x + 60;
+    const ptStartY = b3c.y + b3c.h;
+    const ptEndX = bSugg.x + 60;
+    const ptEndY = bSugg.y - 8;
+    const pathDottedSugg = `M${ptStartX},${ptStartY} C${ptStartX},${ptStartY + 35} ${ptEndX},${ptEndY - 35} ${ptEndX},${ptEndY}`;
+    
+    const arrowSugg = createGrowingArrow(pathDottedSugg, 'f-arrow-purple', 'flow-arrow dotted purple', 'var(--purple)', c3c, cSugg, 260).then(() => {
+      popCard(cSugg);
+    });
+
+    // Top branches to Code Review (4A) staggered 85ms
+    await wait(85);
+    const path3aTo4a = linkCurve(box(c3a), box(c4a));
+    const arrow4a = createGrowingArrow(path3aTo4a, 'f-arrow-teal', 'flow-arrow teal', 'var(--teal)', c3a, c4a, 260).then(() => {
+      popCard(c4a);
+    });
+
+    // Middle branches to Video Demo (4B) staggered 90ms
+    await wait(90);
+    const path3bTo4b = linkCurve(box(c3b), box(c4b));
+    const arrow4b = createGrowingArrow(path3bTo4b, 'f-arrow-green', 'flow-arrow green', 'var(--green)', c3b, c4b, 260).then(() => {
+      popCard(c4b);
+    });
+
+    await Promise.all([arrowSugg, arrow4a, arrow4b]);
+
+    await wait(220);
+    runningAnimation = false;
+
+    // Start spontaneous glowing dot transmissions!
+    startDotLoop();
+  }
+
+  // Scroll trigger
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting && !hasTriggered) {
+        hasTriggered = true;
+        runFastOrchestration();
+      }
+    },
+    { threshold: 0.15 }
+  );
+  observer.observe(container);
+
+  replayBtn.addEventListener('click', () => runFastOrchestration());
+
+  // Window resize fits camera
+  window.addEventListener('resize', () => {
+    if (!runningAnimation && hasTriggered) {
+      setCamera(660, 310, 0.72, 0);
+    }
+  });
+</script>
+
+<style is:global>
+  /* FREE FORMING CANVAS STAGE (NO BOX, NO FRAME, NO SCREENSHOT CHROME) */
+  .flow-free-stage {
+    position: relative;
+    width: 100%;
+    height: 540px;
+    margin: 44px auto 64px;
+    overflow: visible;
+    user-select: none;
+    -webkit-user-select: none;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  /* Quiet floating replay pill */
+  .flow-stage-controls {
+    position: absolute;
+    right: 8px;
+    top: -38px;
+    z-index: 5;
+    pointer-events: auto;
+  }
+
+  .flow-replay-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 13px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--glass-edge);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow);
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.15s, color 0.15s, background 0.15s;
+  }
+
+  .flow-replay-pill:hover {
+    color: var(--ink);
+    transform: translateY(-1px);
+    background: var(--glass);
+  }
+
+  /* VIEWPORT & WORLD */
+  .flow-free-viewport {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+  }
+
+  .flow-free-world {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1300px;
+    height: 660px;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  /* SVG ARROWS */
+  .flow-svg {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .flow-arrow {
+    fill: none;
+    stroke: var(--blue);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .flow-arrow.amber { stroke: var(--amber); }
+  .flow-arrow.teal { stroke: var(--teal); }
+  .flow-arrow.green { stroke: var(--green); }
+  .flow-arrow.dotted.purple {
+    stroke: var(--purple);
+    stroke-width: 2.2;
+    stroke-dasharray: 5 4;
+  }
+
+  /* SPONTANEOUS FLYING GLOWING DOTS (Between cards at random intervals) */
+  .flow-travel-dot {
+    pointer-events: none;
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+
+  .flow-travel-dot .dot-aura {
+    fill: var(--dot-color, var(--blue));
+    opacity: 0.38;
+    filter: drop-shadow(0 0 6px var(--dot-color, var(--blue)));
+  }
+
+  .flow-travel-dot .dot-halo {
+    fill: var(--dot-color, var(--blue));
+    opacity: 0.95;
+  }
+
+  .flow-travel-dot .dot-core {
+    fill: #ffffff;
+    filter: drop-shadow(0 0 2px #ffffff);
+  }
+
+  /* FROSTED GLASS CARDS (FREE FORMING ON CANVAS) */
+  .flow-card {
+    --cw: 224px;
+    --ch: 110px;
+    position: absolute;
+    z-index: 2;
+    width: var(--cw);
+    height: var(--ch);
+    padding: 12px 14px 10px;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--glass-edge);
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow);
+    cursor: default;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: transform 0.18s cubic-bezier(0.2, 1.2, 0.4, 1), box-shadow 0.22s;
+  }
+
+  .flow-card.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .flow-card.pop {
+    animation: flowPopQuick 0.28s cubic-bezier(0.2, 1.35, 0.4, 1);
+  }
+
+  .flow-card.glow-hit {
+    box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 20px -2px var(--c), var(--shadow);
+  }
+
+  .flow-card:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift);
+  }
+
+  .flow-card::before {
+    content: "";
+    position: absolute;
+    left: 14px;
+    top: -1px;
+    width: 44px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--c);
+    box-shadow: 0 0 10px var(--c);
+  }
+
+  .flow-card .f-kind {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    min-height: 18px;
+  }
+
+  .flow-card .repo-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    opacity: 0.8;
+  }
+
+  .flow-card .f-title {
+    margin-top: 1px;
+    font-size: 14.5px;
+    font-weight: 620;
+    letter-spacing: -0.012em;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .flow-card .f-meta {
+    margin: 3px 0 0;
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .flow-card .f-state {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 9px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--c);
+  }
+
+  .flow-card .stroke {
+    width: 30px;
+    height: 2px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--c) 22%, transparent);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flow-card .stroke::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    background: var(--c);
+    border-radius: 2px;
+    animation: flowRunFast 1.2s ease-in-out infinite alternate;
+  }
+
+  @keyframes flowRunFast {
+    from { left: 0; }
+    to { left: 18px; }
+  }
+
+  @keyframes flowPopQuick {
+    from { transform: scale(0.75); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* STATUS CHIPS */
+  .flow-card .f-chips {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transform: scale(0.65);
+    transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.2, 1.4, 0.4, 1);
+  }
+
+  .flow-card .f-chips.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .flow-card .lchip {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--chip);
+    border: 1px solid var(--line);
+    white-space: nowrap;
+    color: var(--ink);
+  }
+
+  .flow-card .lchip.sugg {
+    border-color: var(--purple);
+    border-style: dashed;
+    color: var(--purple);
+    background: color-mix(in srgb, var(--purple) 8%, var(--card));
+  }
+
+  /* AI SUGGESTED FOLLOW-UP CARD (Dotted Border with Sparkle) */
+  .flow-card.c-sugg {
+    border: 1.5px dashed var(--purple);
+    background: color-mix(in srgb, var(--purple) 8%, var(--card));
+    box-shadow: 0 0 16px -4px rgba(122, 82, 224, 0.25), var(--shadow);
+  }
+
+  .flow-card.c-sugg:hover {
+    border-color: var(--purple);
+    box-shadow: 0 0 20px -2px rgba(122, 82, 224, 0.4), var(--lift);
+  }
+
+  .flow-card .sugg-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--purple);
+    font-weight: 600;
+  }
+
+  .sparkle-svg {
+    animation: sparklePulseFast 2s ease-in-out infinite alternate;
+  }
+
+  @keyframes sparklePulseFast {
+    from { transform: scale(0.9); opacity: 0.8; }
+    to { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 4px var(--purple)); }
+  }
+
+  /* Handles */
+  .card-handles {
+    position: absolute;
+    inset: -4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .flow-card:hover .card-handles { opacity: 1; }
+  .h-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1.5px solid var(--muted);
+  }
+  .card-handles span:nth-child(1) { right: 2px; top: 50%; transform: translateY(-50%); }
+  .card-handles span:nth-child(2) { left: 2px; top: 50%; transform: translateY(-50%); }
+
+  @media (max-width: 900px) {
+    .flow-free-stage { height: 480px; margin: 36px auto 48px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flow-card.pop, .flow-card .stroke::after, .sparkle-svg {
+      animation: none !important;
+    }
+    .flow-card, .flow-card .f-chips, .flow-free-world {
+      transition: none !important;
+    }
+  }
+</style>

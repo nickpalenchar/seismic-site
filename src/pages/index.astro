@@ -1,21 +1,21 @@
 ---
 import Base from '../layouts/Base.astro';
 import HeroGridLights from '../components/HeroGridLights.astro';
+import HeroFlowShowcase from '../components/HeroFlowShowcase.astro';
 import MindMapDemo from '../components/MindMapDemo.astro';
 import ReviewDemo from '../components/ReviewDemo.astro';
 import CodeReviewDemo from '../components/CodeReviewDemo.astro';
 import ComingSoonDemo from '../components/ComingSoonDemo.astro';
 import WorkspacesDemo from '../components/WorkspacesDemo.astro';
 ---
-<Base title="Seismic: Hire your VP of Engineering">
+<Base title="Seismic: employ your agents like a VP of Engineering">
   <main>
     <div class="hero-mindmap-zone" id="hero-mindmap-zone">
       <HeroGridLights />
       
       <section class="hero" id="hero">
         <div class="hero-body">
-          <p class="eyebrow">Autonomous Agent Orchestration</p>
-          <h1 class="hero-title">Hire your VP of Engineering</h1>
+          <h1>Employ your agents like a VP of Engineering</h1>
           <p class="lede">Create tasks visually, on a canvas with infinite space. Group, arrange, and associate dependencies (or let agents do it).
             Agents work in the background and record video demos that you approve.</p>
           <div class="cta">
@@ -23,6 +23,8 @@ import WorkspacesDemo from '../components/WorkspacesDemo.astro';
             <a class="btn" href="/demos/">See demos</a>
           </div>
         </div>
+
+        <HeroFlowShowcase />
       </section>
 
       <section class="section" id="mind-map">
@@ -59,12 +61,12 @@ import WorkspacesDemo from '../components/WorkspacesDemo.astro';
     */}
 
     <section class="section text" id="built-with">
-      <h2>Seismic is built with Seismic…</h2>
+      <h2>Seismic is built with Seismic</h2>
       <p class="lede">Demos are published live and regularly.</p>
     </section>
 
     <section class="section text" id="soon">
-      <h2 class="small">…with more cards on the way</h2>
+      <h2>More features coming soon</h2>
       <ComingSoonDemo />
     </section>
   </main>
