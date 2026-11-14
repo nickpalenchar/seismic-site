@@ -50,8 +50,8 @@ const { inline = false } = Astro.props;
     font: 500 12.5px/1.55 var(--sans); color: var(--muted); cursor: pointer; user-select: none;
     background: var(--glass); backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5);
     border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; box-shadow: 0 6px 14px -8px rgba(0,0,0,.25); }
-  .motion-tab { transition: transform .25s ease, opacity .25s ease; }
-  .motion-tab.away { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+  .motion-tab { transition: transform .25s ease, opacity .25s ease, visibility 0s; }
+  .motion-tab.away { transform: translateY(-100%); opacity: 0; pointer-events: none; visibility: hidden; transition-delay: 0s, 0s, .25s; }
   .motion-tab:hover { color: var(--ink); }
   .motion-tab input { margin: 0; width: 14px; height: 14px; accent-color: var(--blue); cursor: pointer; }
   .motion-tab:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
