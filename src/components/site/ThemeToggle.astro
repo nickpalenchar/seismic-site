@@ -1,0 +1,22 @@
+---
+// The ◐ button: flips light/dark and remembers the choice under `seismic-theme`, on the site and in the docs alike.
+// Without a stored choice the system preference applies (frost.css on the site; docs/ThemeProvider.astro in the docs).
+---
+<button class="theme" type="button" data-theme-toggle aria-label="Toggle light and dark">◐</button>
+
+<script>
+  // Bundled once per page however many toggles it has (the docs' mobile menu holds a second one).
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest("[data-theme-toggle]")) return;
+    const el = document.documentElement;
+    const dark = el.dataset.theme ? el.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    el.dataset.theme = next;
+    try { localStorage.setItem("seismic-theme", next); } catch {}
+  });
+</script>
+
+<style>
+  .theme { flex: none; background: none; border: 1px solid var(--line); border-radius: 999px; width: 34px; height: 34px; padding: 0; font: inherit; font-size: 16px; cursor: pointer; color: var(--ink); display: grid; place-items: center; }
+  .theme:hover { background: var(--chip); }
+</style>

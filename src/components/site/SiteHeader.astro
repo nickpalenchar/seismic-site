@@ -1,0 +1,44 @@
+---
+// The site's header row (wordmark, nav, theme toggle), shared by Base.astro and the docs' Header override.
+// The `search` slot sits between wordmark and nav (the docs put Starlight's search there).
+import { githubUrl, navLinks } from "./links";
+import ThemeToggle from "./ThemeToggle.astro";
+
+const path = Astro.url.pathname.replace(/\/$/, "");
+const isCurrent = (href: string) => {
+  const base = href.replace(/\/$/, "");
+  return path === base || path.startsWith(`${base}/`);
+};
+---
+<div class="site-head">
+  <a href="/" class="brand" aria-label="Seismic home">
+    <img class="wm-light" src="/img/wordmark.svg" alt="Seismic" width="111" height="28" />
+    <img class="wm-dark" src="/img/wordmark-dark.svg" alt="" width="111" height="28" />
+  </a>
+  {Astro.slots.has("search") ? <div class="search"><slot name="search" /></div> : <span class="spacer" />}
+  <nav aria-label="Site">
+    {navLinks.map((l) => <a href={l.href} aria-current={isCurrent(l.href) ? "page" : undefined}>{l.label}</a>)}
+    <a class="ext" href={githubUrl} rel="noopener">GitHub</a>
+    <ThemeToggle />
+  </nav>
+</div>
+
+<style>
+  .site-head { display: flex; align-items: center; gap: 24px; width: 100%; height: 100%; }
+  .brand { display: flex; flex: none; }
+  .brand img { height: 28px; width: auto; }
+  .spacer { flex: 1; }
+  .search { flex: 1; display: flex; min-width: 0; }
+  .wm-dark { display: none; }
+  :global(:root[data-theme="dark"]) .wm-light { display: none; }
+  :global(:root[data-theme="dark"]) .wm-dark { display: block; }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .wm-light { display: none; }
+    :global(:root:not([data-theme="light"])) .wm-dark { display: block; }
+  }
+  nav { display: flex; align-items: center; gap: 22px; font: 500 16px/1.55 var(--sans); }
+  nav a { color: var(--ink); text-decoration: none; padding: 4px 0; border-bottom: 1.5px solid transparent; }
+  nav a:hover, nav a[aria-current="page"] { border-bottom-color: currentColor; }
+  nav a.ext::after { content: " ↗"; color: var(--muted); }
+  @media (max-width: 640px) { .site-head { gap: 14px; } nav { gap: 14px; font-size: 15px; } }
+</style>

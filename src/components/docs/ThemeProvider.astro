@@ -1,0 +1,13 @@
+{/* Replaces Starlight's ThemeProvider, which reads its own `starlight-theme` key: the docs follow the site's
+    `seismic-theme` choice (set by the ◐ toggle), else the system preference. Starlight's styles need `data-theme`
+    set either way, so without a choice it holds the system's and follows it when that changes. Inlined against FOUC. */}
+<script is:inline>
+  (() => {
+    const el = document.documentElement;
+    const query = matchMedia("(prefers-color-scheme: dark)");
+    const stored = () => { try { const t = localStorage.getItem("seismic-theme"); return t === "light" || t === "dark" ? t : null; } catch (e) { return null; } };
+    const apply = () => { el.dataset.theme = stored() || (query.matches ? "dark" : "light"); };
+    apply();
+    query.addEventListener("change", () => { if (!stored()) apply(); });
+  })();
+</script>

@@ -1,0 +1,14 @@
+---
+// The site's footer, shared by Base.astro and the docs' Footer override.
+import { githubUrl } from "./links";
+---
+<footer class="site-foot">
+  <span>Seismic, a fork of <a href="https://obeya.si">Obeya</a>.</span>
+  <a href={githubUrl} rel="noopener">GitHub</a>
+</footer>
+
+<style>
+  .site-foot { max-width: var(--wide); margin: 0 auto; padding: 28px 24px 48px; display: flex; gap: 18px; font: 14px/1.55 var(--sans); color: var(--muted); border-top: 1px solid var(--line); }
+  .site-foot a { color: inherit; }
+  span { margin-right: auto; }
+</style>

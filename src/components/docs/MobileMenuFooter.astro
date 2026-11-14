@@ -1,0 +1,15 @@
+---
+// The foot of the docs' mobile menu: what the narrow header leaves out (GitHub, the theme toggle).
+import { githubUrl } from "../site/links";
+import ThemeToggle from "../site/ThemeToggle.astro";
+---
+<div class="mobile-foot">
+  <a class="ext" href={githubUrl} rel="noopener">GitHub</a>
+  <ThemeToggle />
+</div>
+
+<style>
+  .mobile-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 0 1rem; border-top: 1px solid var(--line); }
+  a { color: var(--ink); font: 500 15px/1.55 var(--sans); text-decoration: none; }
+  a::after { content: " ↗"; color: var(--muted); }
+</style>

@@ -1,13 +1,9 @@
 ---
 import '../styles/global.css';
+import SiteFooter from '../components/site/SiteFooter.astro';
+import SiteHeader from '../components/site/SiteHeader.astro';
 interface Props { title?: string; description?: string; }
 const { title = 'Seismic', description = 'Seismic: a spatial canvas for directing AI coding agents.' } = Astro.props;
-const path = Astro.url.pathname.replace(/\/$/, '');
-const links = [
-  { href: '/install/', label: 'Install' },
-  { href: '/docs/', label: 'Docs' },
-  { href: '/demos/', label: 'Demos' },
-];
 ---
 <!doctype html>
 <html lang="en">
@@ -26,27 +22,8 @@ const links = [
   </script>
 </head>
 <body>
-  <header class="top">
-    <a href="/" class="brand" aria-label="Seismic home">
-      <img class="wm-light" src="/img/wordmark.svg" alt="Seismic" width="111" height="28" />
-      <img class="wm-dark" src="/img/wordmark-dark.svg" alt="" width="111" height="28" />
-    </a>
-    <nav>
-      {links.map((l) => <a href={l.href} aria-current={path === l.href.replace(/\/$/, '') ? 'page' : undefined}>{l.label}</a>)}
-      <a class="ext" href="https://github.com/sadilek/obeya" rel="noopener">GitHub</a>
-      <button class="theme" id="theme" type="button" aria-label="Toggle light and dark">◐</button>
-    </nav>
-  </header>
+  <header class="top"><SiteHeader /></header>
   <slot />
-  <footer><span>Seismic, a fork of <a href="https://obeya.si">Obeya</a>.</span><a href="https://github.com/sadilek/obeya" rel="noopener">GitHub</a></footer>
-  <script is:inline>
-    document.getElementById('theme').addEventListener('click', function () {
-      var el = document.documentElement;
-      var dark = el.dataset.theme ? el.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-      var next = dark ? 'light' : 'dark';
-      el.dataset.theme = next;
-      try { localStorage.setItem('seismic-theme', next); } catch (e) {}
-    });
-  </script>
+  <SiteFooter />
 </body>
 </html>

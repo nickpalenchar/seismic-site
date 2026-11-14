@@ -1,0 +1,36 @@
+---
+title: Seismic docs
+description: What Seismic is, how it works, and where to go next.
+sidebar:
+  label: Overview
+---
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+Seismic is a spatial canvas for directing AI coding agents, a fork of [Obeya](https://obeya.si).
+You work like a VP of Engineering: you put tasks on a canvas, the agents build them in the
+background, and you judge the result from a recorded demo instead of reading code.
+
+## How it works
+
+- **A canvas per project.** Every project is a canvas with infinite space, and each card on it is a
+  task. Group cards, arrange them and draw dependencies between them, or let agents do it.
+- **One worker per card.** Each card gets its own agent, working in its own clone or worktree of
+  the repository. Workers run in parallel, resolve conflicts and land their work in order.
+- **A demo for every handover.** When a worker is done it records a narrated video (or a page to
+  look at) and hands the card over. You approve it, or give feedback and the worker carries on.
+- **Adversarial code reviews.** A separate reviewer agent reads every change against the
+  repository's own rules. You decide per finding: fix it, make it a follow-up, or leave it.
+
+:::note
+These docs are new and still growing. If something you need is missing, the
+[GitHub repository](https://github.com/sadilek/obeya) is the place to ask.
+:::
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard title="Install" description="Get Seismic running on your machine." href="/docs/install/" />
+  <LinkCard title="Repository settings" description="Tell Seismic how your repository's app runs, which checks pass and how work lands." href="/docs/reference/settings/" />
+  <LinkCard title="Demos" description="Watch Seismic's own demos, recorded by its workers." href="/demos/" />
+</CardGrid>

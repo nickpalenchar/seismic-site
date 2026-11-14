@@ -1,10 +1,40 @@
 import { defineConfig } from 'astro/config';
+import starlight from '@astrojs/starlight';
 
 // Static output for GitHub Pages. With a custom domain, set `site` to it and keep `base` unset;
 // public/CNAME (add it when the domain is chosen) is copied to the build root.
 export default defineConfig({
   site: 'https://seismic.example',
   output: 'static',
+  integrations: [
+    // The docs under /docs/: content in src/content/docs/docs/, restyled to frost (src/styles/docs.css),
+    // with the site's own header, footer and theme toggle (src/components/docs/).
+    // Starlight is pre-1.0 and its override names move between versions: it is pinned in package.json.
+    starlight({
+      title: 'Seismic',
+      titleDelimiter: '·',
+      description: 'Seismic documentation: install, set up and run Seismic.',
+      favicon: '/img/logo.svg',
+      head: [
+        { tag: 'link', attrs: { rel: 'preload', href: '/fonts/inter-latin-wght-normal.woff2', as: 'font', type: 'font/woff2', crossorigin: '' } },
+        { tag: 'link', attrs: { rel: 'preload', href: '/fonts/bakbak-one-latin-400-normal.woff2', as: 'font', type: 'font/woff2', crossorigin: '' } },
+      ],
+      customCss: ['./src/styles/frost.css', './src/styles/docs.css'],
+      components: {
+        Header: './src/components/docs/Header.astro',
+        Footer: './src/components/docs/Footer.astro',
+        MobileMenuFooter: './src/components/docs/MobileMenuFooter.astro',
+        ThemeProvider: './src/components/docs/ThemeProvider.astro',
+      },
+      sidebar: [
+        { label: 'Start', items: [{ slug: 'docs', label: 'Overview' }, { slug: 'docs/install' }] },
+        { label: 'Reference', items: [{ slug: 'docs/reference/settings' }] },
+      ],
+      // Code blocks (Expressive Code) are configured in ec.config.mjs.
+      // Starlight would claim the site-wide /404; the site has none of its own yet.
+      disable404Route: true,
+    }),
+  ],
   // dev server reached over Tailscale (MagicDNS short name, *.ts.net, or the 100.x IP)
   vite: { server: { allowedHosts: ['nicks-mac-studio', '.ts.net'] } },
 });

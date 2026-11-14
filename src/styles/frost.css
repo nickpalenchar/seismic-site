@@ -1,0 +1,48 @@
+/* The Seismic look, "frost" (obeya src/ui/frost.css): frosted glass over a cool gradient board, ice-blue light, smoked glass dark.
+   Fonts and colour variables only, shared by the site (global.css) and the docs (docs.css). */
+@font-face { font-family: Inter; font-style: normal; font-weight: 100 900; font-display: swap; src: url(/fonts/inter-latin-wght-normal.woff2) format("woff2"); }
+@font-face { font-family: "Bakbak One"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/bakbak-one-latin-400-normal.woff2) format("woff2"); }
+
+:root {
+  --bg: #e6edf5; --dot: rgba(70,100,140,.18); --card: rgba(255,255,255,.55); --ink: #14202e; --muted: #5a6b80; --line: rgba(120,145,175,.24);
+  --glass-edge: rgba(255,255,255,.85); --glass-hi: rgba(255,255,255,.7);
+  --shadow: 0 1px 2px rgba(30,55,90,.06), 0 8px 24px -10px rgba(40,70,110,.32);
+  --lift: 0 2px 4px rgba(30,55,90,.06), 0 18px 40px -14px rgba(40,70,110,.45);
+  --blue: #2f6fe8; --amber: #e05f00; --green: #2f9a3f; --pink: #e0336a; --purple: #7a52e0; --teal: #0b8b93;
+  --dim: rgba(30,45,70,.22); --on-ink: #fff; --panel: #f5f8fc; --glass: rgba(246,249,253,.74); --chip: rgba(120,150,190,.13);
+  --board: radial-gradient(1100px 800px at 12% 18%, rgba(140,185,255,.22), transparent 60%),
+    radial-gradient(900px 700px at 88% 30%, rgba(255,190,220,.14), transparent 60%),
+    radial-gradient(1000px 900px at 60% 95%, rgba(150,230,220,.18), transparent 60%),
+    linear-gradient(135deg, #dce6f2, #eef3f9 55%, #d7e2ef);
+  --display: "Bakbak One", Inter, system-ui, sans-serif;
+  --sans: Inter, system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --wide: 1120px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d1420; --dot: rgba(150,180,220,.10); --card: rgba(150,180,220,.09); --ink: #e6eef8; --muted: #8fa3bb; --line: rgba(180,210,255,.13);
+  --glass-edge: rgba(180,210,255,.16); --glass-hi: rgba(200,225,255,.10);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -10px rgba(0,0,0,.7);
+  --lift: 0 2px 4px rgba(0,0,0,.3), 0 18px 40px -14px rgba(0,0,0,.85);
+  --blue: #6aa2ff; --amber: #ff8a2a; --green: #6fcf6a; --pink: #ff6b95; --purple: #a78bff; --teal: #2fc2c0;
+  --dim: rgba(0,5,15,.5); --on-ink: #0b111a; --panel: #151e2c; --glass: rgba(21,30,44,.76); --chip: rgba(150,180,220,.10);
+  --board: radial-gradient(1100px 800px at 12% 18%, rgba(50,90,180,.18), transparent 60%),
+    radial-gradient(900px 700px at 88% 30%, rgba(130,60,150,.10), transparent 60%),
+    radial-gradient(1000px 900px at 60% 95%, rgba(20,120,130,.12), transparent 60%),
+    linear-gradient(135deg, #0d1420, #141d2b 55%, #0b111a);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0d1420; --dot: rgba(150,180,220,.10); --card: rgba(150,180,220,.09); --ink: #e6eef8; --muted: #8fa3bb; --line: rgba(180,210,255,.13);
+  --glass-edge: rgba(180,210,255,.16); --glass-hi: rgba(200,225,255,.10);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -10px rgba(0,0,0,.7);
+  --lift: 0 2px 4px rgba(0,0,0,.3), 0 18px 40px -14px rgba(0,0,0,.85);
+  --blue: #6aa2ff; --amber: #ff8a2a; --green: #6fcf6a; --pink: #ff6b95; --purple: #a78bff; --teal: #2fc2c0;
+  --dim: rgba(0,5,15,.5); --on-ink: #0b111a; --panel: #151e2c; --glass: rgba(21,30,44,.76); --chip: rgba(150,180,220,.10);
+  --board: radial-gradient(1100px 800px at 12% 18%, rgba(50,90,180,.18), transparent 60%),
+    radial-gradient(900px 700px at 88% 30%, rgba(130,60,150,.10), transparent 60%),
+    radial-gradient(1000px 900px at 60% 95%, rgba(20,120,130,.12), transparent 60%),
+    linear-gradient(135deg, #0d1420, #141d2b 55%, #0b111a);
+  color-scheme: dark;
+}

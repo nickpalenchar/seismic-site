@@ -1,0 +1,135 @@
+/* The docs (Starlight) in the frost look. Starlight's own styles sit in cascade layers, so these unlayered rules win.
+   frost.css switches its variables with `data-theme`, which the docs always set (components/docs/ThemeProvider.astro),
+   so one mapping serves light and dark. */
+
+:root {
+  --sl-font: var(--sans);
+  --sl-font-mono: var(--mono);
+
+  --sl-color-white: var(--ink);
+  --sl-color-gray-1: var(--ink);
+  --sl-color-gray-2: color-mix(in srgb, var(--ink) 75%, var(--muted));
+  --sl-color-gray-3: var(--muted);
+  --sl-color-gray-4: color-mix(in srgb, var(--muted) 70%, transparent);
+  --sl-color-gray-5: var(--line);
+  --sl-color-gray-6: var(--chip);
+  --sl-color-gray-7: var(--chip);
+  --sl-color-black: var(--panel);
+
+  --sl-color-accent-low: color-mix(in srgb, var(--blue) 16%, transparent);
+  --sl-color-accent: var(--blue);
+  --sl-color-accent-high: var(--blue);
+  --sl-color-blue-low: color-mix(in srgb, var(--blue) 12%, transparent);
+  --sl-color-blue: var(--blue);
+  --sl-color-blue-high: var(--blue);
+  --sl-color-purple-low: color-mix(in srgb, var(--purple) 12%, transparent);
+  --sl-color-purple: var(--purple);
+  --sl-color-purple-high: var(--purple);
+  --sl-color-orange-low: color-mix(in srgb, var(--amber) 12%, transparent);
+  --sl-color-orange: var(--amber);
+  --sl-color-orange-high: var(--amber);
+  --sl-color-green-low: color-mix(in srgb, var(--green) 12%, transparent);
+  --sl-color-green: var(--green);
+  --sl-color-green-high: var(--green);
+  --sl-color-red-low: color-mix(in srgb, var(--pink) 12%, transparent);
+  --sl-color-red: var(--pink);
+  --sl-color-red-high: var(--pink);
+
+  --sl-color-text: var(--ink);
+  --sl-color-text-accent: var(--blue);
+  --sl-color-text-invert: var(--on-ink);
+  --sl-color-bg: var(--bg);
+  --sl-color-bg-nav: var(--glass);
+  --sl-color-bg-sidebar: var(--glass);
+  --sl-color-bg-inline-code: var(--chip);
+  --sl-color-bg-accent: var(--blue);
+  --sl-color-hairline-light: var(--line);
+  --sl-color-hairline: var(--line);
+  --sl-color-hairline-shade: var(--line);
+  --sl-color-backdrop-overlay: var(--dim);
+  --sl-shadow-md: var(--shadow);
+  --sl-shadow-lg: var(--lift);
+
+  /* The site's header: 14px padding around the 34px theme button. */
+  --sl-nav-height: 62px;
+  --sl-nav-pad-x: 16px;
+  --sl-nav-pad-y: 14px;
+  --sl-text-body: 1rem;
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.12;
+  --sl-text-h1: clamp(2.125rem, 4vw, 3rem);
+  --sl-text-h2: 1.75rem;
+  --sl-text-h3: 1.375rem;
+  --sl-text-h4: 1.125rem;
+}
+@media (min-width: 50em) { :root { --sl-nav-pad-x: 24px; } }
+
+body { background-color: var(--bg); background-image: var(--board); background-attachment: fixed; color: var(--ink);
+  font-feature-settings: "cv11", "ss01"; letter-spacing: -.003em; -webkit-font-smoothing: antialiased; }
+
+/* Header and sidebar: glass panels over the board. */
+header.header, .sidebar-pane, mobile-starlight-toc nav {
+  backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5);
+}
+header.header { background-color: var(--glass); border-bottom-color: var(--line); }
+@media (min-width: 50em) { .sidebar-pane { border-inline-end-color: var(--line); } }
+
+/* Search in the header: a chip like the rest of the frost UI. */
+header.header site-search { width: 100%; max-width: 22rem; }
+header.header button[data-open-modal] { color: var(--muted); font-family: var(--sans); }
+@media (min-width: 50em) {
+  header.header button[data-open-modal] { width: 100%; height: 34px; background: var(--chip); border-color: var(--line); border-radius: 8px; font-size: 15px; }
+  header.header button[data-open-modal]:hover { color: var(--ink); border-color: var(--muted); }
+}
+site-search dialog { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--lift); }
+
+/* Mobile: the site's nav stays; the menu button sits at the header's end. */
+.sl-menu-button { background-color: var(--chip) !important; color: var(--ink) !important; border: 1px solid var(--line) !important; box-shadow: none !important; }
+.sl-menu-button:has(~ :popover-open) { background-color: var(--panel) !important; }
+@media (max-width: 49.99em) {
+  /* GitHub and the theme toggle move into the menu's foot (docs/MobileMenuFooter.astro) to leave room for search. */
+  .site-head { gap: 10px !important; }
+  .site-head nav { gap: 12px !important; font-size: 14px !important; }
+  .site-head nav a.ext, .site-head nav .theme { display: none !important; }
+  .site-head .brand img { height: 22px !important; }
+  .site-head .search { flex: none; order: 2; }
+}
+
+/* Sidebar: small uppercase group labels, the current page as a chip. */
+.sidebar-content .group-label .large { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sidebar-content a { border-radius: 8px; color: var(--ink); }
+.sidebar-content a:hover { background: var(--chip); }
+.sidebar-content a[aria-current="page"], .sidebar-content a[aria-current="page"]:hover, .sidebar-content a[aria-current="page"]:focus {
+  background: var(--chip); color: var(--blue); font-weight: 600;
+}
+
+/* Headings in the display face, as on the site. */
+.sl-markdown-content :is(h1, h2, h3, h4, h5), h1#_top, .card .title {
+  font-family: var(--display); font-weight: 400; letter-spacing: 0; color: var(--ink);
+}
+.sl-markdown-content :is(p, li) { color: var(--ink); }
+.sl-markdown-content a { color: var(--blue); }
+.sl-markdown-content :not(pre) > code { background: var(--chip); border: 1px solid var(--line); border-radius: 5px; padding: .1em .35em; font-size: .88em; }
+
+/* "On this page". */
+.right-sidebar { border-inline-start-color: var(--line); }
+starlight-toc h2, mobile-starlight-toc .toggle { font-family: var(--sans); color: var(--muted); }
+starlight-toc a[aria-current="true"], mobile-starlight-toc a[aria-current="true"] { color: var(--blue); }
+
+/* Code blocks: glass frames. */
+.expressive-code .frame { box-shadow: var(--shadow); border-radius: 10px; }
+
+/* Callouts: tinted glass with a rounded edge. */
+.starlight-aside { border-radius: 10px; border: 1px solid var(--line); border-inline-start-width: 4px; border-inline-start-color: var(--sl-color-asides-border); }
+.starlight-aside__title { font-family: var(--sans); }
+
+/* Cards and previous/next links: glass cards that lift on hover, like the site's buttons. */
+.sl-link-card, .card, .pagination-links a {
+  background: var(--card); border: 1px solid var(--glass-edge); border-radius: 12px;
+  backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow); transition: transform .15s, box-shadow .15s;
+}
+.sl-link-card:hover, .pagination-links a:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift); border-color: var(--glass-edge); background: var(--card); }
+.sl-link-card .title { font-weight: 600; }
+.pagination-links a .link-title { font-family: var(--display); font-weight: 400; color: var(--ink); }
+.pagination-links a { color: var(--blue); }

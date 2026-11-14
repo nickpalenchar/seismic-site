@@ -1,0 +1,12 @@
+---
+// Starlight's footer (previous/next links) followed by the site's own footer.
+import Default from "@astrojs/starlight/components/Footer.astro";
+import SiteFooter from "../site/SiteFooter.astro";
+---
+<Default />
+<div class="docs-site-foot"><SiteFooter /></div>
+
+<style>
+  .docs-site-foot { margin-top: 3rem; }
+  .docs-site-foot :global(.site-foot) { padding-inline: 0; }
+</style>
