@@ -22,7 +22,7 @@ const isCurrent = (href: string) => {
     <a class="ext" href={githubUrl} rel="noopener">GitHub</a>
     <ThemeToggle />
   </nav>
-  <MotionToggle />
+  {path === "" && <MotionToggle />}
 </div>
 
 <style>

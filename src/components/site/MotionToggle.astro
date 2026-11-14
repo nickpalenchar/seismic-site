@@ -1,6 +1,5 @@
 ---
-// The reduced-motion tab, hanging from the navbar's bottom edge at the right (SiteHeader.astro, on the site and in
-// the docs). A click is the visitor's choice from then on (`seismic-motion`); without one, a change of the device's
+// The reduced-motion tab, hanging from the navbar's bottom edge at the right (SiteHeader.astro, home page only). A click is the visitor's choice from then on (`seismic-motion`); without one, a change of the device's
 // preference is followed. Every change is announced ("seismic:motion", lib/motion.ts). MotionInit.astro sets the
 // state before first paint. `inline`: a plain checkbox row instead of the tab (the docs' mobile menu).
 interface Props { inline?: boolean; }
@@ -27,6 +26,17 @@ const { inline = false } = Astro.props;
       set(box.checked);
     });
   });
+  // The tab (not the docs' inline row) tucks away while scrolling down and returns on any scroll up.
+  const tab = document.querySelector<HTMLElement>(".motion-tab:not(.inline)");
+  if (tab) {
+    let last = scrollY;
+    addEventListener("scroll", () => {
+      const y = scrollY;
+      if (Math.abs(y - last) < 4) return;
+      tab.classList.toggle("away", y > last && y > 40);
+      last = y;
+    }, { passive: true });
+  }
   device.addEventListener("change", () => {
     let saved = null;
     try { saved = localStorage.getItem("seismic-motion"); } catch {}
@@ -40,6 +50,8 @@ const { inline = false } = Astro.props;
     font: 500 12.5px/1.55 var(--sans); color: var(--muted); cursor: pointer; user-select: none;
     background: var(--glass); backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5);
     border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; box-shadow: 0 6px 14px -8px rgba(0,0,0,.25); }
+  .motion-tab { transition: transform .25s ease, opacity .25s ease; }
+  .motion-tab.away { transform: translateY(-100%); opacity: 0; pointer-events: none; }
   .motion-tab:hover { color: var(--ink); }
   .motion-tab input { margin: 0; width: 14px; height: 14px; accent-color: var(--blue); cursor: pointer; }
   .motion-tab:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
