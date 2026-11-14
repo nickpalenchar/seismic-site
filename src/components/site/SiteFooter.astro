@@ -1,9 +1,9 @@
 ---
 // The site's footer, shared by Base.astro and the docs' Footer override.
-import { githubUrl } from "./links";
+import { githubUrl, obeyaUrl } from "./links";
 ---
 <footer class="site-foot">
-  <span>Seismic, a fork of <a href="https://obeya.si">Obeya</a>.</span>
+  <span>Seismic, a fork of <a href={obeyaUrl} rel="noopener">Obeya</a>.</span>
   <a href={githubUrl} rel="noopener">GitHub</a>
 </footer>
 

@@ -1,0 +1,11 @@
+{/* Reduced motion, before first paint: the visitor's own choice (the tab under the navbar, MotionToggle.astro), else
+    the device's preference, else off. Every animation keys off <html data-motion> (MotionToggle.astro's styles, the
+    demos, lib/motion.ts). In the <head> of Base.astro and of the docs (docs/ThemeProvider.astro). */}
+<script is:inline>
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('seismic-motion'); } catch (e) {}
+    var reduce = saved ? saved === 'reduce' : matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.documentElement.dataset.motion = reduce ? 'reduce' : 'full';
+  })();
+</script>

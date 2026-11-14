@@ -133,3 +133,8 @@ starlight-toc a[aria-current="true"], mobile-starlight-toc a[aria-current="true"
 .sl-link-card .title { font-weight: 600; }
 .pagination-links a .link-title { font-family: var(--display); font-weight: 400; color: var(--ink); }
 .pagination-links a { color: var(--blue); }
+
+/* The reduced-motion tab (site/MotionToggle.astro) hangs over the narrow screens' "On this page" bar: keep that bar's
+   current heading clear of it. On phones the tab moves into the menu's foot (docs/MobileMenuFooter.astro) instead. */
+@media (min-width: 50em) and (max-width: 71.99rem) { mobile-starlight-toc summary { padding-inline-end: 190px; } }
+@media (max-width: 49.99em) { header.header .motion-tab { display: none; } }

@@ -4,4 +4,5 @@ export const navLinks = [
   { href: "/docs/", label: "Docs" },
   { href: "/demos/", label: "Demos" },
 ];
-export const githubUrl = "https://github.com/sadilek/obeya";
+export const githubUrl = "https://github.com/nickpalenchar/seismic";
+export const obeyaUrl = "https://github.com/sadilek/obeya";

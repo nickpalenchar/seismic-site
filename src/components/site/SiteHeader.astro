@@ -1,7 +1,8 @@
 ---
-// The site's header row (wordmark, nav, theme toggle), shared by Base.astro and the docs' Header override.
+// The site's header row (wordmark, nav, theme toggle, the reduced-motion tab below it), shared by Base.astro and the docs' Header override.
 // The `search` slot sits between wordmark and nav (the docs put Starlight's search there).
 import { githubUrl, navLinks } from "./links";
+import MotionToggle from "./MotionToggle.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 
 const path = Astro.url.pathname.replace(/\/$/, "");
@@ -21,6 +22,7 @@ const isCurrent = (href: string) => {
     <a class="ext" href={githubUrl} rel="noopener">GitHub</a>
     <ThemeToggle />
   </nav>
+  <MotionToggle />
 </div>
 
 <style>

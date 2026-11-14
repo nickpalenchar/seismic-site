@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import MotionInit from '../components/site/MotionInit.astro';
 import SiteFooter from '../components/site/SiteFooter.astro';
 import SiteHeader from '../components/site/SiteHeader.astro';
 interface Props { title?: string; description?: string; }
@@ -20,6 +21,7 @@ const { title = 'Seismic', description = 'Seismic: a spatial canvas for directin
     // Apply a saved choice before first paint; without one the system's preference applies (CSS).
     try { var t = localStorage.getItem('seismic-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
+  <MotionInit />
 </head>
 <body>
   <header class="top"><SiteHeader /></header>

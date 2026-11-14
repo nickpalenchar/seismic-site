@@ -1,3 +1,6 @@
+---
+import MotionInit from "../site/MotionInit.astro";
+---
 {/* Replaces Starlight's ThemeProvider, which reads its own `starlight-theme` key: the docs follow the site's
     `seismic-theme` choice (set by the ◐ toggle), else the system preference. Starlight's styles need `data-theme`
     set either way, so without a choice it holds the system's and follows it when that changes. Inlined against FOUC. */}
@@ -11,3 +14,4 @@
     query.addEventListener("change", () => { if (!stored()) apply(); });
   })();
 </script>
+<MotionInit />
