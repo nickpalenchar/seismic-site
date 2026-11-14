@@ -43,4 +43,6 @@ const isCurrent = (href: string) => {
   nav a:hover, nav a[aria-current="page"] { border-bottom-color: currentColor; }
   nav a.ext::after { content: " ↗"; color: var(--muted); }
   @media (max-width: 640px) { .site-head { gap: 14px; } nav { gap: 14px; font-size: 15px; } }
+  /* on a phone the GitHub link goes, so the row fits */
+  @media (max-width: 480px) { nav a.ext { display: none; } }
 </style>
