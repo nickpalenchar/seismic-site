@@ -1,0 +1,19 @@
+---
+// Starlight's page frame with the site's footer at the foot of the page, below the article and its
+// "On this page" column, so it spans the page as on the site (the sidebar stays fixed beside it).
+import Default from "@astrojs/starlight/components/PageFrame.astro";
+import SiteFooter from "../site/SiteFooter.astro";
+---
+<Default>
+  <slot name="header" slot="header" />
+  <slot name="sidebar" slot="sidebar" />
+  <slot />
+  <div class="docs-foot"><SiteFooter /></div>
+</Default>
+
+<style>
+  /* The "On this page" column is fixed and full height: the footer band covers its divider with the board,
+     down to the bottom of the window on a page shorter than it. */
+  :global(.main-frame) { flex: 1; display: flex; flex-direction: column; }
+  .docs-foot { flex: 1; position: relative; z-index: var(--sl-z-index-toc); background-color: var(--bg); background-image: var(--board); background-attachment: fixed; }
+</style>

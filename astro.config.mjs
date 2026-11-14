@@ -22,7 +22,7 @@ export default defineConfig({
       customCss: ['./src/styles/frost.css', './src/styles/docs.css'],
       components: {
         Header: './src/components/docs/Header.astro',
-        Footer: './src/components/docs/Footer.astro',
+        PageFrame: './src/components/docs/PageFrame.astro',
         MobileMenuFooter: './src/components/docs/MobileMenuFooter.astro',
         ThemeProvider: './src/components/docs/ThemeProvider.astro',
       },
