@@ -1,4 +1,5 @@
 ---
+import PlayableVideo from "./PlayableVideo.astro";
 // "Watch the demo instead of manually testing": Interactive, animating task demo card, for the Kinship card created in
 // the section above (its real demo: public/video/kinship-attendance, from the card's demo directory).
 // 1. Initial view: Centered conversation with initial request ("● Initial request") and first user bubble.
@@ -26,10 +27,8 @@
   <div class="rv-cols" id="rv-cols">
     <!-- Left: Demo Module (Appears and unrolls on the left) -->
     <div class="rv-left" id="rv-left">
-      <video class="rv-video" id="rv-video" src="/video/kinship-attendance/demo.mp4" poster="/video/kinship-attendance/poster.jpg"
-        controls preload="metadata" playsinline>
-        <track kind="captions" src="/video/kinship-attendance/captions.vtt" srclang="en" label="English" />
-      </video>
+      <PlayableVideo class="rv-video" id="rv-video" src="/video/kinship-attendance/demo.mp4"
+        poster="/video/kinship-attendance/poster.jpg" captions="/video/kinship-attendance/captions.vtt" label="Play the demo" />
       <ul class="rv-chapters" id="rv-chapters">
         <li data-t="0"><span>0:00</span>Went to N events</li>
         <li data-t="15.76"><span>0:15</span>On the event page</li>
@@ -153,10 +152,7 @@
       return;
     }
 
-    // 1. Initial State: Centered conversation with initial request
-    await wait(350);
-
-    // 2. Card GROWS to full width, chat moves right, demo module unfolds on left
+    // 2. The card grows to full width as soon as it is in view, chat moves right, demo module unfolds on left
     card.classList.add('expanded');
     card.style.setProperty('--rv-accent', 'var(--amber)');
     stateEl.textContent = '● Demo ready';
@@ -202,15 +198,17 @@
     isRunning = false;
   }
 
-  // Scroll trigger
+  // Scroll trigger: once 40% of the card is in view (or, on a screen too short for that, once it fills 40% of it)
+  const IN_VIEW = 0.4;
   const observer = new IntersectionObserver(
     ([entry]) => {
-      if (entry.isIntersecting && !hasTriggered) {
+      const fillsScreen = !!entry.rootBounds && entry.intersectionRect.height >= entry.rootBounds.height * IN_VIEW;
+      if ((entry.intersectionRatio >= IN_VIEW || fillsScreen) && !hasTriggered) {
         hasTriggered = true;
         runDemoAnimation();
       }
     },
-    { threshold: 0.22 }
+    { threshold: [0, 0.2, IN_VIEW, 0.6, 0.8, 1] }
   );
   observer.observe(card);
 

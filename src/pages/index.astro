@@ -10,7 +10,7 @@ import ComingSoonDemo from '../components/ComingSoonDemo.astro';
 import WorkspacesDemo from '../components/WorkspacesDemo.astro';
 import DevicesDemo from '../components/DevicesDemo.astro';
 ---
-<Base title="Seismic: employ your agents like a VP of Engineering">
+<Base title="Seismic | Visual agent driver">
   <main>
     <div class="hero-mindmap-zone" id="hero-mindmap-zone">
       <HeroGridLights />
@@ -29,26 +29,12 @@ import DevicesDemo from '../components/DevicesDemo.astro';
         <HeroFlowShowcase />
       </section>
 
-      <section class="section split" id="mind-map">
-        <div class="split-text">
-          <h2>Visualize your project</h2>
-          <p class="lede">Every project is a canvas, and each card is a task. Create the task anywhere. Agents start working in isolated environments.</p>
-        </div>
+      <section class="section band" id="mind-map">
+        <h2>Visualize your project</h2>
+        <p class="lede">Every project is a canvas, and each card is a task. Create the task anywhere. Agents start working in isolated environments.</p>
         <MindMapDemo />
       </section>
     </div>
-
-    <section class="section split flip band" id="onboarding">
-      <div class="split-text">
-        <h2>Existing project? Seismic onboards it</h2>
-        <p class="lede">Let the agent explore the project and show you how demos will work.</p>
-      </div>
-      <OnboardDemo
-        video="/video/kinship-onboard/demo.mp4"
-        poster="/video/kinship-onboard/poster.jpg"
-        captions="/video/kinship-onboard/captions.vtt"
-      />
-    </section>
 
     <section class="section split band" id="demos">
       <div class="split-text">
@@ -58,20 +44,20 @@ import DevicesDemo from '../components/DevicesDemo.astro';
       <ReviewDemo />
     </section>
 
-    <section class="section split flip band" id="workspaces">
-      <div class="split-text">
-        <h2>Isolated workspace flows are built in</h2>
-        <p class="lede">Each agent works in its own clone or worktree. They run features in parallel, resolve conflicts, and coordinate development order. You're notified only when you need to be.</p>
-      </div>
-      <WorkspacesDemo />
-    </section>
-
-    <section class="section text split band" id="reviews">
+    <section class="section text split flip band" id="reviews">
       <div class="split-text">
         <h2>Ensure quality with adversarial code reviews</h2>
         <p class="lede">A separate reviewer agent reads every change against your repository's own rules. You decide per finding: fix it, make it a follow-up, or ignore it.</p>
       </div>
       <CodeReviewDemo />
+    </section>
+
+    <section class="section split band" id="workspaces">
+      <div class="split-text">
+        <h2>Isolated workspace flows are built in</h2>
+        <p class="lede">Each agent works in its own clone or worktree. They run features in parallel, resolve conflicts, and coordinate development order. You're notified only when you need to be.</p>
+      </div>
+      <WorkspacesDemo />
     </section>
 
     <section class="section band" id="anywhere">
@@ -107,6 +93,18 @@ import DevicesDemo from '../components/DevicesDemo.astro';
       </DevicesDemo>
     </section>
 
+    <section class="section split band" id="onboarding">
+      <div class="split-text">
+        <h2>Existing project? Seismic onboards it</h2>
+        <p class="lede">Let the agent explore the project and show you how demos will work.</p>
+      </div>
+      <OnboardDemo
+        video="/video/kinship-onboard/demo.mp4"
+        poster="/video/kinship-onboard/poster.jpg"
+        captions="/video/kinship-onboard/captions.vtt"
+      />
+    </section>
+
     {/* Hidden until it ships (listed under "More features coming soon"):
     <section class="section text" id="benchmarks">
       <h2>Benchmark your agents against real deliverables</h2>
@@ -130,6 +128,7 @@ import DevicesDemo from '../components/DevicesDemo.astro';
 
 <style>
   /* each banded section gets its own faint tint (see .section.band in global.css) */
+  #mind-map { --tint: var(--pink); }
   #onboarding { --tint: var(--blue); }
   #demos { --tint: var(--purple); }
   #workspaces { --tint: var(--teal); }

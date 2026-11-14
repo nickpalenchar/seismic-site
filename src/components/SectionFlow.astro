@@ -1,0 +1,134 @@
+---
+// The homepage's "snap + morph" flow. On a wide screen with a mouse or trackpad, and with motion not reduced:
+// - a scroll settles on each section: a scroll that stops between two sections glides on to the next one in its
+//   direction, while a section taller than the screen still scrolls freely through. (CSS scroll-snap can't do this:
+//   past the end of a tall section Chrome snaps a wheel step back to that end, so a mouse wheel never gets past it.)
+// - each section fills the screen, and one fixed layer behind the page fades to the tint of the section in the
+//   middle of the screen (its data-tint), in place of the sections' own bands,
+// - each section's text and demo rise into place as they enter and settle back as they leave (scroll-driven
+//   animations; where those are unsupported, as in Firefox, the snapping and tints still apply).
+// Anywhere else (phones, tablets, reduced motion, other pages) the page scrolls as before, with its bands.
+---
+<script>
+  import { reducedMotion } from "../lib/motion";
+
+  const root = document.documentElement;
+  const header = document.querySelector<HTMLElement>(".top");
+  const sections = [...document.querySelectorAll<HTMLElement>("main.flow .hero, main.flow .section")];
+  const wide = matchMedia("(min-width: 1000px) and (pointer: fine)");
+  const flowOn = () => wide.matches && !reducedMotion();
+
+  // the sticky header's height: snapping and anchors land below it
+  const measureHeader = () => root.style.setProperty("--top-h", `${header?.offsetHeight ?? 64}px`);
+  measureHeader();
+  if (header) new ResizeObserver(measureHeader).observe(header);
+
+  // the section crossing the middle of the screen gives the page its tint; kept as var() so the theme still applies
+  const observer = new IntersectionObserver((entries) => {
+    const active = entries.find((e) => e.isIntersecting)?.target as HTMLElement | undefined;
+    if (!active) return;
+    const tint = active.dataset.tint;
+    root.style.setProperty("--flow-tint", tint ? `var(--${tint})` : "transparent");
+  }, { rootMargin: "-45% 0px -45% 0px" });
+  sections.forEach((s) => observer.observe(s));
+
+  // Where the page may come to rest: a section's start, anywhere within a section taller than the screen (until its
+  // end meets the bottom), and the very bottom of the page. Measured each time, as demos change their height.
+  type Range = [number, number];
+  function restRanges(): Range[] {
+    const headerH = header?.offsetHeight ?? 64;
+    const view = innerHeight - headerH;
+    const max = root.scrollHeight - innerHeight;
+    const clamp = (v: number) => Math.max(0, Math.min(max, Math.round(v)));
+    const ranges = sections.map((s): Range => {
+      const r = s.getBoundingClientRect();
+      const start = r.top + scrollY - headerH;
+      return [clamp(start), clamp(Math.max(start, start + r.height - view))];
+    });
+    ranges.push([max, max]);
+    return ranges.sort((a, b) => a[0] - b[0]);
+  }
+
+  // When a scroll stops between two resting places, glide on to the next one in the direction it was last moving
+  // (a wheel step that interrupts a glide keeps its direction, so the glide carries on rather than turning back)
+  let lastY = scrollY;
+  let dir = 0;
+  addEventListener("scroll", () => {
+    const moved = Math.sign(scrollY - lastY);
+    if (moved) dir = moved;
+    lastY = scrollY;
+  }, { passive: true });
+  function settle() {
+    const y = scrollY;
+    if (!flowOn()) return;
+    const ranges = restRanges();
+    if (ranges.some(([a, b]) => y >= a - 2 && y <= b + 2)) return;
+    const next = ranges.find(([a]) => a > y)?.[0];
+    const prev = ranges.filter(([, b]) => b < y).pop()?.[1];
+    const nearest = next === undefined || (prev !== undefined && y - prev < next - y) ? prev : next;
+    const target = (dir > 0 ? next : dir < 0 ? prev : nearest) ?? nearest;
+    if (target === undefined) return;
+    scrollTo({ top: target, behavior: "smooth" });
+  }
+  if ("onscrollend" in window) {
+    addEventListener("scrollend", settle);
+  } else {
+    let timer = 0;
+    addEventListener("scroll", () => { clearTimeout(timer); timer = window.setTimeout(settle, 140); }, { passive: true });
+  }
+</script>
+
+<style is:global>
+  @media (min-width: 1000px) and (pointer: fine) {
+    /* anchors land below the sticky header */
+    :root:not([data-motion="reduce"]):has(main.flow) { scroll-padding-top: var(--top-h, 64px); }
+
+    :root:not([data-motion="reduce"]) main.flow {
+      /* a section fills the screen below the header, its content in the middle (a one-column grid, unless it
+         already sits side by side: .section.split from 1400px, in global.css) */
+      & .section.band, & .section.split {
+        min-height: calc(100svh - var(--top-h, 64px));
+        display: grid;
+        align-content: center;
+      }
+      & .section.band:not(.split) { grid-template-columns: minmax(0, 1fr); }
+      @media (max-width: 1399.98px) {
+        & .section.split { grid-template-columns: minmax(0, 1fr); }
+      }
+
+      /* the fixed layer below gives the tint, so the bands step aside */
+      & .section.band::before { background: transparent; border-top-color: transparent; }
+    }
+
+    /* one tint for the whole screen, fading to the section in view */
+    :root:not([data-motion="reduce"]) body:has(main.flow)::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-color: color-mix(in srgb, var(--flow-tint, transparent) 8%, transparent);
+      transition: background-color .8s ease;
+    }
+
+    /* text and demo rise into place as a section enters and settle back as it leaves; the text a little faster */
+    @supports (animation-timeline: view()) {
+      :root:not([data-motion="reduce"]) main.flow {
+        & .section.split > *, & .dv-wrap > * {
+          --flow-rise: 48px;
+          animation: flow-in linear both, flow-out linear forwards;
+          animation-timeline: view(), view();
+          animation-range: entry 10% cover 35%, exit 40% exit 100%;
+        }
+        & .section.split > .split-text, & .dv-wrap > .dv-text { --flow-rise: 96px; }
+      }
+    }
+  }
+
+  @keyframes flow-in {
+    from { opacity: 0; transform: translateY(var(--flow-rise, 64px)) scale(.96); }
+  }
+  @keyframes flow-out {
+    to { opacity: .55; transform: translateY(-40px) scale(.95); }
+  }
+</style>

@@ -1,6 +1,98 @@
 ---
-import Base from '../../layouts/Base.astro';
+import Base from "../../layouts/Base.astro";
+import { githubUrl } from "../../components/site/links";
+
+// Building from source is the only way to run Seismic for now; the steps match the repository's
+// scripts (`bun start` serves a normal checkout on port 4417, with its home in ~/.seismic).
+const steps = [
+  {
+    title: "Clone the repository",
+    commands: [`git clone ${githubUrl}.git`, "cd seismic"],
+  },
+  {
+    title: "Install the dependencies",
+    commands: ["bun install"],
+  },
+  {
+    title: "Start Seismic",
+    commands: ["bun start"],
+  },
+];
 ---
 <Base title="Install · Seismic">
-  <main><article class="page"><h1>Install</h1><p>Coming soon.</p></article></main>
+  <main>
+    <article class="page install">
+      <h1>Install</h1>
+
+      <section class="install-section" aria-labelledby="from-source">
+        <h2 id="from-source">Build from source</h2>
+        <p>
+          You need <a href="https://bun.sh">Bun</a>, git and <a href="https://claude.com/claude-code">Claude Code</a> with
+          a login. The GitHub CLI (<code>gh</code>) with a login is optional, for pull requests.
+        </p>
+
+        <ol class="install-steps">
+          {steps.map((step) => (
+            <li>
+              <b>{step.title}</b>
+              <pre><code>{step.commands.join("\n")}</code></pre>
+            </li>
+          ))}
+        </ol>
+
+        <p>
+          Seismic serves the canvas at <code>http://localhost:4417</code> and prints a link that signs your browser in.
+          The first start opens the setup assistant, which checks your machine and creates your first project.
+        </p>
+      </section>
+
+      <aside class="install-callout" role="note">Official release channels coming soon.</aside>
+    </article>
+  </main>
 </Base>
+
+<style>
+  .install h2 { margin-top: 40px; font-size: clamp(24px, 2.8vw, 30px); }
+  .install-section p { margin: 14px 0 0; }
+  .install-section a { color: var(--blue); text-underline-offset: 3px; }
+  .install-steps { margin: 24px 0 0; padding: 0; list-style: none; counter-reset: step; }
+  .install-steps li { counter-increment: step; position: relative; padding-left: 40px; }
+  .install-steps li + li { margin-top: 22px; }
+  .install-steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue);
+    background: color-mix(in srgb, var(--blue) 12%, transparent);
+  }
+  .install-steps b { display: block; font-weight: 600; }
+  .install pre {
+    margin: 8px 0 0;
+    padding: 12px 16px;
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--glass-edge);
+    background: var(--card);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .install code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+  .install pre code { font-size: inherit; }
+  .install-callout {
+    margin-top: 40px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--blue) 30%, transparent);
+    background: color-mix(in srgb, var(--blue) 8%, transparent);
+    font-weight: 600;
+    color: var(--ink);
+  }
+</style>

@@ -1,4 +1,5 @@
 ---
+import PlayableVideo from "./PlayableVideo.astro";
 // "Existing project? Seismic onboards it": the body of the "Set up Seismic for kinship" card once its demo is
 // ready, stripped to its two parts: the demo video on the left, the agent's handover on the right (scrolled to its
 // end, as in the app).
@@ -15,9 +16,7 @@ const { video, poster, captions } = Astro.props;
   <div class="ob-cols">
     <div class="ob-left">
       {video ? (
-        <video class="ob-video" src={video} poster={poster} controls preload="metadata" playsinline>
-          {captions && <track kind="captions" src={captions} srclang="en" label="English" />}
-        </video>
+        <PlayableVideo class="ob-video" src={video} poster={poster} captions={captions} label="Play the onboarding demo" />
       ) : (
         <div class="ob-video ob-poster">
           <img src={poster} alt="Kinship, the app the demo shows" loading="lazy" />
@@ -108,7 +107,7 @@ const { video, poster, captions } = Astro.props;
     gap: 28px;
   }
 
-  .ob-video {
+  .ob :global(.ob-video) {
     display: block;
     width: 100%;
     aspect-ratio: 16 / 10;

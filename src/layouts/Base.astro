@@ -5,6 +5,9 @@ import SiteFooter from '../components/site/SiteFooter.astro';
 import SiteHeader from '../components/site/SiteHeader.astro';
 interface Props { title?: string; description?: string; }
 const { title = 'Seismic', description = 'Seismic: a spatial canvas for directing AI coding agents.' } = Astro.props;
+// what a link to the page shows when pasted into a chat (iMessage, WhatsApp, Slack…): public/img/og.png
+const pageUrl = new URL(Astro.url.pathname, Astro.site);
+const shareImage = new URL("/img/og.png", Astro.site);
 ---
 <!doctype html>
 <html lang="en">
@@ -13,6 +16,18 @@ const { title = 'Seismic', description = 'Seismic: a spatial canvas for directin
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{title}</title>
   <meta name="description" content={description} />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Seismic" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={pageUrl} />
+  <meta property="og:image" content={shareImage} />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="The Seismic wordmark over three task cards joined by arrows" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content={shareImage} />
   <link rel="icon" href="/img/logo.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
   <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />

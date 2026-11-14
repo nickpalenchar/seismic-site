@@ -35,6 +35,6 @@ export default defineConfig({
       disable404Route: true,
     }),
   ],
-  // dev server reached over Tailscale (MagicDNS short name, *.ts.net, or the 100.x IP)
-  vite: { server: { allowedHosts: ['nicks-mac-studio', '.ts.net'] } },
+  // dev server reached over Tailscale (*.ts.net; the 100.x IP is allowed anyway)
+  vite: { server: { allowedHosts: ['.ts.net'] } },
 });

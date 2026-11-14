@@ -1,6 +1,6 @@
 ---
 title: Repository settings
-description: How a repository tells Seismic how its app runs, which checks a change must pass and how work lands, in .obeya/settings.json.
+description: How a repository tells Seismic how its app runs, which checks a change must pass and how work lands, in .seismic/settings.json.
 sidebar:
   label: Repository settings
 ---
@@ -8,13 +8,13 @@ sidebar:
 Seismic runs on any git repository as it is. What it cannot know by itself is how *this* project
 works: how its app starts and stops, which checks a change must pass, how approved work lands, how
 a worker records a demo and where demos are shared. A repository says that in its settings,
-`.obeya/settings.json`, versioned with the code it describes (like `.vscode/settings.json`).
+`.seismic/settings.json`, versioned with the code it describes (like `.vscode/settings.json`).
 "Configuration" shows them with the repository on its project's page and changes them without a line of
 code, for one machine or, with "Take over into the repository for everyone", for everyone.
 
 The quickest way to get them: in "Configuration", a repository without settings of its own has
 "Have an agent fill them in". It puts a card on the
-repository's project whose worker writes them with the `obeya:settings` skill: it reads the
+repository's project whose worker writes them with Seismic's settings skill: it reads the
 repository, starts the app, records a demo with it to prove the recipe, and asks you what it
 cannot find out (a login, test data). It also drafts the allow list of commands agents run there
 without asking (the `Bash` rules of `.claude/settings.json`, which Seismic applies to its Codex
@@ -28,7 +28,7 @@ writing or changing them yourself.
 A typical web app: a Node API and a Vite frontend, PostgreSQL in Docker Compose, tests and lint
 in `package.json`, work landing through pull requests on GitHub, demos shared on Cloudflare Pages.
 
-```json title=".obeya/settings.json"
+```json title=".seismic/settings.json"
 {
   "land": "pr",
   "direct": false,
@@ -70,7 +70,7 @@ under `## Goal`. Any other file there shows on the canvas in a note, with the
 reason it is not a plan and "Als Plan aufbereiten", which has an agent add the checklist; a
 file that is meant to stay as it is (a template, an index) goes into `exclude`. Default:
 `{ "dir": "docs/plan", "exclude": ["TEMPLATE.md"] }`. The skill's check script
-(`lib/check.ts` in the `obeya:settings` skill) lists which docs in the directory are plans and why the
+(`lib/check.ts` in Seismic's settings skill) lists which docs in the directory are plans and why the
 others are not.
 
 ### `setup` — a command
@@ -174,7 +174,7 @@ page for something to look at; the worker picks which, and runs the app for it a
   its project's overview). It goes before the narration language of the demo settings (each
   machine's, in "Configuration"), which applies without it. Seismic gives it to its workers as
   `DEMO_LANGUAGE`, which the demo skill reads; a session without Seismic finds it in the repository's
-  `.obeya/settings.json`. A voice that clones a clip uses the clip of this language, so each
+  `.seismic/settings.json`. A voice that clones a clip uses the clip of this language, so each
   machine's demo settings name one per language.
 
 - `artifacts`: which artifacts a handover may bring, a list of `"video"`, `"html"` (an HTML page,
@@ -186,10 +186,10 @@ Where "Share" puts demos for colleagues is not a repository's setting: each proj
 this machine's demo sites (Configuration → Demos) and a path on it, in its settings. A `site` here,
 which repositories named until 2026-11-06, is no longer read and shows as a problem.
 
-The shared pages get a look of the repository's own from `.obeya/theme.css` beside this file, a
+The shared pages get a look of the repository's own from `.seismic/theme.css` beside this file, a
 stylesheet put into every page after Seismic's own (as the default branch has it): its colour
-variables, fonts, a logo as a `data:`-embedded file of `.obeya/` (a reference to anything outside
-`.obeya/` is dropped). It is a file, not a setting. What it styles is the pages' markup, which
+variables, fonts, a logo as a `data:`-embedded file of `.seismic/` (a reference to anything outside
+`.seismic/` is dropped). It is a file, not a setting. What it styles is the pages' markup, which
 changes only on purpose: the colour variables on `:root` (`--bg`, `--card`, `--ink`, `--muted`,
 `--line`, `--chip`, `--accent`, for light and dark), and on a page `main`, `.top`, `h1`, `.when`,
 `.tags` with `.tag`, `.text`, `.grid` with `.player` and its chapters, `.pr`, `.links`, `.artifact`,
@@ -206,12 +206,12 @@ project is named after its first repository (the name in its `origin` URL, else 
 
 ## Which value applies
 
-Every machine that runs Seismic on the repository reads `.obeya/settings.json`, a fresh clone
+Every machine that runs Seismic on the repository reads `.seismic/settings.json`, a fresh clone
 included. Which value applies, highest first:
 
 1. The one set for this machine in "Configuration" (a repository's settings on its project's page; kept in
    `projects.json` in Seismic's home, never in the repository).
-2. `.obeya/settings.json` **as the default branch has it**.
+2. `.seismic/settings.json` **as the default branch has it**.
 3. What Seismic detects (`land`, the main branch).
 4. Seismic's default.
 
@@ -235,7 +235,7 @@ for everyone" takes the values set for this machine (all but the main branch) in
 shows the file as it will be and where it goes; where work lands on the main branch, Seismic commits
 it there (beside the checkout, which keeps everything else as it is; a change of its own to the
 file is refused), and the values then come from the repository on this machine too. Where work
-goes out as pull requests, Seismic pushes the commit to a branch of its own (`obeya-settings-…`) and
+goes out as pull requests, Seismic pushes the commit to a branch of its own (`seismic-settings-…`) and
 opens a pull request against the main branch; this machine keeps its values until the pull
 request is merged, then they come from the repository. Where work may also go straight to main
 (`direct`), it offers to push the commit straight onto `origin`'s main branch instead (never
@@ -247,10 +247,10 @@ Seismic checks every field of the file. A field it does not know (`check:` for `
 wrong type (`"checks": "pnpm test"` instead of a list) does not count, and a mistake inside one
 (`app.stp` for `stop`) takes the whole field along: Seismic's default stands in
 its place, and the rest of the settings work. Each one shows as a problem at the repository in
-"Configuration", starting with `.obeya/settings.json`, with the field and, for a misspelt one,
+"Configuration", starting with `.seismic/settings.json`, with the field and, for a misspelt one,
 what it probably meant (`check: no such field (did you mean checks?)` under "Details").
 
-A `.obeya/adapter/` on the
+An old `adapter/` folder on the
 main branch, from before Seismic read everything from the settings, shows as a problem with "Have
 an agent fill them in" beside it, whose worker moves what it says into the settings and
 deletes it. These problems keep nothing from being saved, since they are fixed in the repository;
@@ -278,7 +278,7 @@ into the repository for everyone".
 ## Testing the settings
 
 1. **Every field counts.** In the repository, with the settings in the checkout (committed or
-   not), run the settings skill's check, `lib/check.ts` in the `obeya:settings` skill of a Seismic
+   not), run the settings skill's check, `lib/check.ts` in the settings skill of a Seismic
    checkout (`plugin/skills/settings/` there):
 
    ```bash

@@ -1,0 +1,60 @@
+---
+// A video with its native controls plus a large play button in the middle, shown while the video is paused.
+// The button sits over the poster (or the first frame), so a click anywhere near the centre starts it.
+interface Props {
+  src: string;
+  poster?: string;
+  captions?: string;
+  id?: string;
+  class?: string;
+  label?: string;
+}
+const { src, poster, captions, id, class: className, label = "Play video" } = Astro.props;
+---
+<div class="pv">
+  <video class={className} id={id} src={src} poster={poster} controls preload="metadata" playsinline>
+    {captions && <track kind="captions" src={captions} srclang="en" label="English" />}
+  </video>
+  <button type="button" class="pv-play" aria-label={label}>
+    <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
+  </button>
+</div>
+
+<script>
+  for (const wrap of document.querySelectorAll<HTMLElement>(".pv")) {
+    const video = wrap.querySelector("video")!;
+    const button = wrap.querySelector<HTMLButtonElement>(".pv-play")!;
+    const sync = () => wrap.classList.toggle("playing", !video.paused);
+    button.addEventListener("click", () => { video.play().catch(() => {}); });
+    video.addEventListener("play", sync);
+    video.addEventListener("pause", sync);
+    video.addEventListener("ended", sync);
+  }
+</script>
+
+<style>
+  .pv { position: relative; }
+  .pv-play {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 68px;
+    height: 68px;
+    margin: -34px 0 0 -34px;
+    padding: 0 0 0 4px;
+    border: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: rgba(0, 0, 0, .55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
+    cursor: pointer;
+    transition: transform .15s, background .15s, opacity .2s;
+  }
+  .pv-play:hover { transform: scale(1.08); background: rgba(0, 0, 0, .7); }
+  .pv-play:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+  .pv.playing .pv-play { opacity: 0; pointer-events: none; }
+</style>
