@@ -3,10 +3,12 @@ import Base from '../layouts/Base.astro';
 import HeroGridLights from '../components/HeroGridLights.astro';
 import HeroFlowShowcase from '../components/HeroFlowShowcase.astro';
 import MindMapDemo from '../components/MindMapDemo.astro';
+import OnboardDemo from '../components/OnboardDemo.astro';
 import ReviewDemo from '../components/ReviewDemo.astro';
 import CodeReviewDemo from '../components/CodeReviewDemo.astro';
 import ComingSoonDemo from '../components/ComingSoonDemo.astro';
 import WorkspacesDemo from '../components/WorkspacesDemo.astro';
+import DevicesDemo from '../components/DevicesDemo.astro';
 ---
 <Base title="Seismic: employ your agents like a VP of Engineering">
   <main>
@@ -15,7 +17,7 @@ import WorkspacesDemo from '../components/WorkspacesDemo.astro';
       
       <section class="hero" id="hero">
         <div class="hero-body">
-          <h1>Employ your agents like a VP of Engineering</h1>
+          <h1>The Mind-Map Harness for your Agentic Software Factory</h1>
           <p class="lede">Create tasks visually, on a canvas with infinite space. Group, arrange, and associate dependencies (or let agents do it).
             Agents work in the background and record video demos that you approve.</p>
           <div class="cta">
@@ -27,29 +29,82 @@ import WorkspacesDemo from '../components/WorkspacesDemo.astro';
         <HeroFlowShowcase />
       </section>
 
-      <section class="section" id="mind-map">
-        <h2>Mind map your project</h2>
-        <p class="lede">Every project is a canvas, and each card is a task. Create the task anywhere. Agents start working.</p>
+      <section class="section split" id="mind-map">
+        <div class="split-text">
+          <h2>Visualize your project</h2>
+          <p class="lede">Every project is a canvas, and each card is a task. Create the task anywhere. Agents start working in isolated environments.</p>
+        </div>
         <MindMapDemo />
       </section>
     </div>
 
-    <section class="section" id="demos">
-      <h2>Watch the demo instead of manually testing</h2>
-      <p class="lede">Agents record a demo. Watch it, approve it, or give feedback and the agents get back to work.</p>
+    <section class="section split flip band" id="onboarding">
+      <div class="split-text">
+        <h2>Existing project? Seismic onboards it</h2>
+        <p class="lede">Let the agent explore the project and show you how demos will work.</p>
+      </div>
+      <OnboardDemo
+        video="/video/kinship-onboard/demo.mp4"
+        poster="/video/kinship-onboard/poster.jpg"
+        captions="/video/kinship-onboard/captions.vtt"
+      />
+    </section>
+
+    <section class="section split band" id="demos">
+      <div class="split-text">
+        <h2>Watch the demo instead of manually testing</h2>
+        <p class="lede">Agents record a demo. Watch it, approve it, or give feedback and the agents get back to work.</p>
+      </div>
       <ReviewDemo />
     </section>
 
-    <section class="section" id="workspaces">
-      <h2>Isolated workspace flows are built in</h2>
-      <p class="lede">Each agent works in its own clone or worktree. They run features in parallel, resolve conflicts, and coordinate development order. You're notified only when you need to be.</p>
+    <section class="section split flip band" id="workspaces">
+      <div class="split-text">
+        <h2>Isolated workspace flows are built in</h2>
+        <p class="lede">Each agent works in its own clone or worktree. They run features in parallel, resolve conflicts, and coordinate development order. You're notified only when you need to be.</p>
+      </div>
       <WorkspacesDemo />
     </section>
 
-    <section class="section text" id="reviews">
-      <h2>Ensure quality with adversarial code reviews</h2>
-      <p class="lede">A separate reviewer agent reads every change against your repository's own rules. You decide per finding: fix it, make it a follow-up, or ignore it.</p>
+    <section class="section text split band" id="reviews">
+      <div class="split-text">
+        <h2>Ensure quality with adversarial code reviews</h2>
+        <p class="lede">A separate reviewer agent reads every change against your repository's own rules. You decide per finding: fix it, make it a follow-up, or ignore it.</p>
+      </div>
       <CodeReviewDemo />
+    </section>
+
+    <section class="section band" id="anywhere">
+      <DevicesDemo
+        show={["phone", "tablet"]}
+        laptop={{ src: "/video/anywhere/laptop.webp", still: "/video/anywhere/laptop-still.jpg", alt: "Seismic in a laptop's browser" }}
+        phone={{ src: "/video/anywhere/phone.webp", still: "/video/anywhere/phone-still.jpg", alt: "Seismic on a phone" }}
+        tablet={{ src: "/video/anywhere/tablet.webp", still: "/video/anywhere/tablet-still.jpg", alt: "Seismic on a tablet" }}
+      >
+        <h2>Take Seismic wherever you go</h2>
+        <p class="lede">Set up Seismic with Tailscale and command it on any screen.</p>
+        <ol class="dv-steps">
+          <li>
+            <b>Turn on “Reachable from other devices.”</b>
+            Seismic keeps running on your computer. It adds one <code>tailscale serve</code> entry, which gives it an
+            HTTPS address on your tailnet, and leaves your other entries alone.
+          </li>
+          <li>
+            <b>Scan “Connect a phone.”</b>
+            The QR code holds a one-time code that lasts five minutes. The phone or tablet stays paired until you
+            remove it, or until it goes unused for 90 days.
+          </li>
+          <li>
+            <b>Run your agents from anywhere.</b>
+            Answer their questions, watch demos and approve the work from the couch or on the road.
+          </li>
+        </ol>
+        <p class="dv-note">
+          Nothing passes through a service of ours: it’s your computer and your tailnet. A device that isn’t paired
+          only sees how to connect. Not on Tailscale? Seismic can also listen on another VPN’s address. More ways to
+          connect are coming soon.
+        </p>
+      </DevicesDemo>
     </section>
 
     {/* Hidden until it ships (listed under "More features coming soon"):
@@ -60,14 +115,40 @@ import WorkspacesDemo from '../components/WorkspacesDemo.astro';
     </section>
     */}
 
-    <section class="section text" id="built-with">
-      <h2>Seismic is built with Seismic</h2>
-      <p class="lede">Demos are published live and regularly.</p>
+    <section class="section text built-with" id="built-with">
+      <h2>Seismic is built with Seismic...</h2>
+      <p class="lede">Demos published regularly at<br /><a href="http://demos.seismic.im">demos.seismic.im</a></p>
     </section>
 
     <section class="section text" id="soon">
-      <h2>More features coming soon</h2>
+      <h2>...with more features coming soon</h2>
+      <br/>
       <ComingSoonDemo />
     </section>
   </main>
 </Base>
+
+<style>
+  /* each banded section gets its own faint tint (see .section.band in global.css) */
+  #onboarding { --tint: var(--blue); }
+  #demos { --tint: var(--purple); }
+  #workspaces { --tint: var(--teal); }
+  #reviews { --tint: var(--amber); }
+  #anywhere { --tint: var(--green); }
+  .built-with { position: relative; overflow: hidden; isolation: isolate; padding: 72px 24px 40px;
+    width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); background: var(--card); }
+  .built-with::before { content: ""; position: absolute; inset: -40%; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(40% 40% at 25% 35%, rgba(70,130,255,.30), transparent 70%),
+      radial-gradient(35% 35% at 75% 60%, rgba(120,190,255,.28), transparent 70%),
+      radial-gradient(30% 30% at 55% 20%, rgba(150,120,255,.18), transparent 70%);
+    filter: blur(20px); animation: bw-drift 18s ease-in-out infinite alternate; }
+  :root[data-theme="dark"] .built-with::before { opacity: .7; }
+  .built-with a { color: var(--blue); font-weight: 600; text-underline-offset: 3px; }
+  @keyframes bw-drift {
+    from { transform: translate3d(-6%, -4%, 0) rotate(0deg) scale(1); }
+    to   { transform: translate3d(6%, 4%, 0) rotate(12deg) scale(1.12); }
+  }
+  /* reduced motion: the device's preference, or the toggle under the navbar (Base.astro) */
+  :global(:root[data-motion="reduce"]) .built-with::before { animation: none; }
+</style>

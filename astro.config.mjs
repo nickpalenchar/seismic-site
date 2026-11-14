@@ -4,7 +4,7 @@ import starlight from '@astrojs/starlight';
 // Static output for GitHub Pages. With a custom domain, set `site` to it and keep `base` unset;
 // public/CNAME (add it when the domain is chosen) is copied to the build root.
 export default defineConfig({
-  site: 'https://seismic.example',
+  site: 'https://seismic.im',
   output: 'static',
   integrations: [
     // The docs under /docs/: content in src/content/docs/docs/, restyled to frost (src/styles/docs.css),

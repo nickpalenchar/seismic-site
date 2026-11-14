@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:00.351 --> 00:00:15.151
+Until now, nothing in Kinship showed how often you go to a club. Events now say, next to the club name, how many of that club's events Jordan went to: nine with the film society, fifteen with the run club. Clubs Jordan never went to show nothing.
+
+00:00:16.105 --> 00:00:19.225
+The same line sits under the club name on the event page.
+
+00:00:20.177 --> 00:00:34.817
+On the club page, a new section shows Jordan's own achievements. The attendance bar has ten dark grey segments, and each event Jordan went to fills one in green. Nine of ten here, with the hint: attend ten times to become a regular.
+
+00:00:35.772 --> 00:00:45.172
+After ten events, the badge appears. Jordan has been to fifteen runs with the Eastside Run Collective, so the section shows the Regular badge above a full bar.
+
+00:00:46.128 --> 00:00:54.488
+The demo data now reaches twenty weeks back, so there is a regular to show. My plans now counts every event Jordan attended, not just the twenty it lists.
+
+00:00:55.442 --> 00:01:00.802
+Members now see how often they went to each club, and earn the Regular badge after ten events.

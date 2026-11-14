@@ -3,13 +3,14 @@
 // mic bottom middle, dotted board, fixed-size cards, dependency arrows). A sonar dot invites a double-click (double-tap on touch).
 // The card appears where you click, unfolds into the open card over a dimmed canvas (as in the app: a flight to the
 // middle, then the unfold), its description types in, "Start agent" is pressed, and it folds back into its place, working,
-// with an animated dependency arrow connecting it to the active workflow.
+// with an animated dependency arrow connecting it to the active workflow. The first card is Kinship's attendance/Regulars
+// task: its status line then advances through the agent's steps every 8–13 s and ends recording the demo.
 ---
 <div class="mm" id="mm" role="application" aria-label="Interactive demo: double-click the canvas to create a task card">
   <div class="mm-chrome" aria-hidden="true">
     <div class="mm-bar">
       <img src="/img/logo.svg" alt="" width="26" height="26" />
-      <span class="mm-pill"><b>Tipjar</b> <i>main</i></span>
+      <span class="mm-pill"><b>kinship</b> <i>main</i></span>
       <span class="mm-pill hide-s">Archive</span>
       <span class="mm-pill hide-s">Queue <em>1</em></span>
       <span class="mm-pill">+ New task</span>
@@ -21,16 +22,9 @@
 
   <!-- SVG Dependency Arrows -->
   <svg class="mm-deps" id="mm-deps" aria-hidden="true">
-    <defs>
-      <marker id="mm-arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
-        <path d="M0 1.5L9 5L0 8.5z" fill="var(--green)" />
-      </marker>
-      <marker id="mm-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
-        <path d="M0 1.5L9 5L0 8.5z" fill="var(--blue)" />
-      </marker>
-    </defs>
-    <!-- Settled line: Round to whole dollars (a) -> Run tests (b) -->
-    <path id="mm-line-ab" class="mm-path done" marker-end="url(#mm-arrow-green)" />
+    <!-- Settled line: Calendar view (a) -> Waitlist (b) -->
+    <path id="mm-line-ab" class="mm-path done" />
+    <path id="mm-head-ab" class="mm-head done" />
     <path id="mm-pulse-ab" class="mm-pulse done" />
     <!-- Dynamic lines to newly created cards -->
     <g id="mm-dynamic-lines"></g>
@@ -39,16 +33,16 @@
   <div class="mm-card static a hide-s" id="mm-card-a" style="--c:var(--green)">
     <div class="cs-handles" aria-hidden="true"><span class="cs-dot dot-t"></span><span class="cs-dot dot-r"></span><span class="cs-dot dot-b"></span><span class="cs-dot dot-l"></span></div>
     <span class="kind">Task</span>
-    <b class="ttl">Round to whole dollars</b>
-    <p class="meta">A switch rounds each share up to the dollar.</p>
+    <b class="ttl">Calendar view for Events</b>
+    <p class="meta">A month grid with a chip per event, in its club's colour.</p>
     <span class="state">Approved</span>
   </div>
 
   <div class="mm-card static b hide-s" id="mm-card-b" style="--c:var(--blue)">
     <div class="cs-handles" aria-hidden="true"><span class="cs-dot dot-t"></span><span class="cs-dot dot-r"></span><span class="cs-dot dot-b"></span><span class="cs-dot dot-l"></span></div>
     <span class="kind">Task</span>
-    <b class="ttl">Run the tests on every push</b>
-    <p class="meta">Writing the workflow.</p>
+    <b class="ttl">Waitlist for full events</b>
+    <p class="meta">Writing the waitlist migration.</p>
     <span class="state working">Agent at work<i class="stroke"></i></span>
   </div>
 
@@ -74,30 +68,52 @@
 </div>
 
 <script>
+  import { reducedMotion } from '../lib/motion';
+  import { linkWithHead } from '../lib/arrow';
   const $ = (id: string) => document.getElementById(id)!;
   const area = $('mm'), hint = $('mm-hint'), dim = $('mm-dim'), panel = $('mm-panel'), pbody = $('mm-pbody'),
     ptitle = $('mm-ptitle'), start = $('mm-start'), map = $('mm-map');
   const lineAB = $('mm-line-ab') as unknown as SVGPathElement;
+  const headAB = $('mm-head-ab') as unknown as SVGPathElement;
   const pulseAB = $('mm-pulse-ab') as unknown as SVGPathElement;
   const dynamicLines = $('mm-dynamic-lines');
   const cardA = $('mm-card-a');
   const cardB = $('mm-card-b');
 
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const UNFOLD = 300;
   const HEAD = 10;
 
-  const tasks = [
-    { t: 'Add dark mode', d: 'Follow the system setting, with a toggle in the top bar.' },
-    { t: 'Fix the login redirect', d: 'After signing in, return to the page the user came from.' },
-    { t: 'Export the board as PDF', d: 'One page per canvas, cards in their arranged positions.' },
-    { t: 'Speed up search', d: 'Index card titles on write instead of scanning on read.' },
-    { t: 'Onboarding checklist', d: 'Three steps on first launch, dismissible and remembered.' },
+  interface Task {
+    t: string;
+    d: string;
+    /** What the card's status line says while its agent works, in order; the last one is while it records the demo. */
+    steps?: string[];
+    /** A title that takes two lines: the card is a little taller. */
+    tall?: boolean;
+  }
+  const tasks: Task[] = [
+    {
+      t: 'Club page should show my attendance, regulars',
+      d: 'On events at clubs I\'ve been to, show "Went to N events" next to the club name.\n\n'
+        + 'On the club page, add a section for my achievements: an "Attendance" bar of 10 grey segments that fill in '
+        + 'green as I attend, with the hint "Attend 10 times to become a regular". At 10, I earn the "Regulars" badge.',
+      steps: [
+        'Reading the code: planning attendance counts + Regulars section',
+        'Building attendance counts on events, attendance bar + Regulars badge',
+        'Running regression tests',
+        'Built and committed, tests pass, recording demo',
+      ],
+      tall: true,
+    },
+    { t: 'Add to calendar', d: 'An .ics download and a Google Calendar link on the event page.' },
+    { t: 'Search clubs on Discover', d: 'A search box and category chips above the club grid, kept in the URL.' },
+    { t: 'Club discussion thread', d: 'Members post on the club page; organizers get an "Organizer" tag.' },
+    { t: 'Recurring events', d: 'Store the repeat rule; cancel a single date without touching the rest.' },
   ];
   let n = 0, busy = false, hurry = false, closeReq = false;
   let decide: ((v: 'start' | 'close') => void) | null = null;
   const cards: HTMLElement[] = [];
-  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, hurry ? 0 : reduce ? Math.min(ms, 150) : ms));
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, hurry || reducedMotion() ? 0 : ms));
   const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
   type B = { x: number; y: number; w: number; h: number };
@@ -112,7 +128,7 @@
     return { left: (W - w) / 2, top: Math.max(66, (H - h) / 2 + 24), width: w, height: h };
   };
 
-  function path(a: B, b: B): string {
+  function path(a: B, b: B) {
     const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w)), gapY = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
     const across = gapX > gapY;
     const dir = (across ? Math.sign(b.x + b.w / 2 - (a.x + a.w / 2)) : Math.sign(b.y + b.h / 2 - (a.y + a.h / 2))) || 1;
@@ -121,19 +137,22 @@
     const along = across ? x2 - x1 : y2 - y1, aside = across ? y2 - y1 : x2 - x1;
     const reach = dir * Math.max((dir * along) / 2, Math.min(Math.abs(aside) / 2, HEAD));
     const [c1x, c1y, c2x, c2y] = across ? [x1 + reach, y1, x2 - reach, y2] : [x1, y1 + reach, x2, y2 - reach];
-    return `M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`;
+    return linkWithHead(x1, y1, c1x, c1y, c2x, c2y, x2, y2);
   }
 
   function updateStaticArrow() {
     if (!cardA || !cardB || !lineAB || window.innerWidth < 760) {
       if (lineAB) lineAB.style.display = 'none';
       if (pulseAB) pulseAB.style.display = 'none';
+      if (headAB) headAB.style.display = 'none';
       return;
     }
     lineAB.style.display = '';
     if (pulseAB) pulseAB.style.display = '';
-    const d = path(boxOf(cardA), boxOf(cardB));
+    if (headAB) headAB.style.display = '';
+    const { d, head } = path(boxOf(cardA), boxOf(cardB));
     lineAB.setAttribute('d', d);
+    headAB.setAttribute('d', head);
     if (pulseAB) pulseAB.setAttribute('d', d);
   }
 
@@ -153,6 +172,7 @@
     to: HTMLElement;
     p: SVGPathElement;
     pulse: SVGPathElement;
+    h: SVGPathElement;
   }
   const createdEdges: CreatedEdge[] = [];
 
@@ -160,12 +180,14 @@
     if (!dynamicLines) return;
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     p.setAttribute('class', 'mm-path active');
-    p.setAttribute('marker-end', 'url(#mm-arrow-blue)');
+    const h = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    h.setAttribute('class', 'mm-head active');
 
     const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     pulse.setAttribute('class', 'mm-pulse blue');
 
-    const d = path(boxOf(fromEl), boxOf(toEl));
+    const { d, head } = path(boxOf(fromEl), boxOf(toEl));
+    h.setAttribute('d', head);
     p.setAttribute('d', d);
     pulse.setAttribute('d', d);
 
@@ -176,12 +198,29 @@
     p.style.transition = 'stroke-dashoffset 0.6s cubic-bezier(0.2, 0.9, 0.3, 1)';
 
     dynamicLines.appendChild(p);
+    dynamicLines.appendChild(h);
     dynamicLines.appendChild(pulse);
-    createdEdges.push({ from: fromEl, to: toEl, p, pulse });
+    createdEdges.push({ from: fromEl, to: toEl, p, pulse, h });
 
     requestAnimationFrame(() => {
       p.style.strokeDashoffset = '0';
     });
+  }
+
+  /** How long the agent stays on a step: 15–22s, with reduced motion too (it is the story, not an animation). */
+  const stepMs = () => 15000 + Math.random() * 7000;
+
+  function progress(el: HTMLElement, meta: HTMLElement, state: HTMLElement, steps: string[]) {
+    meta.textContent = steps[0]!;
+    let i = 0;
+    const next = () => {
+      if (!el.isConnected || ++i >= steps.length) return;
+      meta.textContent = steps[i]!;
+      meta.classList.remove('tick'); void meta.offsetWidth; meta.classList.add('tick');
+      if (i === steps.length - 1) state.innerHTML = 'Agent at work<span class="rec">· Recording demo</span><i class="stroke"></i>';
+      else setTimeout(next, stepMs());
+    };
+    setTimeout(next, stepMs());
   }
 
   async function create(clientX: number, clientY: number) {
@@ -193,7 +232,7 @@
 
     // the card, where it was made
     const el = document.createElement('div');
-    el.className = 'mm-card fresh';
+    el.className = 'mm-card fresh' + (task.tall ? ' tall' : '');
     el.style.setProperty('--c', 'var(--muted)');
     el.innerHTML = '<div class="cs-handles" aria-hidden="true"><span class="cs-dot dot-t"></span><span class="cs-dot dot-r"></span><span class="cs-dot dot-b"></span><span class="cs-dot dot-l"></span></div><span class="kind">Task</span><b class="ttl untitled">New task</b><p class="meta"></p><span class="state">Planned</span>';
     area.appendChild(el);
@@ -213,7 +252,8 @@
 
     // unfold: from the card's rect to the open card's
     ptitle.innerHTML = '<span class="ph">What is it about?</span>';
-    pbody.innerHTML = '<span class="ph">Description</span><span class="caret"></span>';
+    // with reduced motion the description is simply there; otherwise a placeholder, then it types itself in
+    pbody.innerHTML = reducedMotion() ? `<span class="txt">${task.d.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>` : '<span class="ph">Description</span><span class="caret"></span>';
     start.classList.remove('pressed', 'beckon');
     panel.classList.remove('ready', 'anim');
     setRect(rectOf(el));
@@ -229,11 +269,12 @@
 
     // the description types itself in
     await sleep(250);
-    pbody.innerHTML = '<span class="txt"></span><span class="caret"></span>';
+    if (!reducedMotion()) pbody.innerHTML = '<span class="txt"></span><span class="caret"></span>';
     const txt = pbody.querySelector<HTMLElement>('.txt')!;
-    if (hurry || reduce) txt.textContent = task.d;
-    else for (let i = 1; i <= task.d.length && !hurry; i++) { txt.textContent = task.d.slice(0, i); await sleep(16); }
+    if (hurry || reducedMotion()) txt.textContent = task.d;
+    else for (let i = 2; i < task.d.length + 2 && !hurry; i += 2) { txt.textContent = task.d.slice(0, i); pbody.scrollTop = pbody.scrollHeight; await sleep(16); }
     txt.textContent = task.d;
+    pbody.scrollTop = pbody.scrollHeight;
     await sleep(550);
 
     // user decision
@@ -260,10 +301,12 @@
       el.classList.add('working');
       el.style.setProperty('--c', 'var(--blue)');
       state.className = 'state working'; state.innerHTML = 'Agent at work<i class="stroke"></i>';
+      if (task.steps) progress(el, meta, state, task.steps);
 
       // Connect to the previous card or card B with a flowing arrow!
+      // (only to a card that shows: on phones card B is hidden, and an arrow from it would start at the corner)
       const parentCard = cards.length > 1 ? cards[cards.length - 2] : cardB;
-      if (parentCard) {
+      if (parentCard && parentCard.offsetParent !== null) {
         addArrow(parentCard, el);
       }
     }
@@ -326,7 +369,13 @@
     filter: drop-shadow(0 0 5px rgba(47, 111, 232, 0.4));
   }
 
+  .mm-head { stroke: none; fill: var(--muted); }
+  .mm-head.done { fill: var(--green); }
+  .mm-head.active { fill: var(--blue); animation: mmHeadIn .25s .45s both; }
+  @keyframes mmHeadIn { from { opacity: 0; } to { opacity: 1; } }
+
   .mm-pulse {
+    display: none;
     fill: none;
     stroke-linecap: round;
     stroke-dasharray: 10 140;
@@ -378,10 +427,14 @@
   .mm-card:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift); }
   .mm-card::before { content: ""; position: absolute; left: 14px; top: -1px; width: 46px; height: 3px; border-radius: 0 0 3px 3px; background: var(--c); box-shadow: 0 0 10px var(--c); }
   .mm-card .kind { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); }
-  .mm-card .ttl { display: block; margin-top: 1px; font-size: 16px; font-weight: 620; letter-spacing: -.012em; line-height: 1.2; }
+  .mm-card .ttl { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 1px; font-size: 16px; font-weight: 620; letter-spacing: -.012em; line-height: 1.2; }
+  .mm-card.tall { --ch: 156px; }
+  .mm-card .meta.tick { animation: mm-tick .4s ease; }
+  @keyframes mm-tick { from { opacity: 0; transform: translateY(3px); } }
   .mm-card .ttl.untitled { color: var(--muted); font-weight: 400; font-style: italic; }
   .mm-card .meta { margin: 4px 0 0; font-size: 13px; line-height: 1.38; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .mm-card .state { position: absolute; left: 15px; right: 15px; bottom: 10px; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--c); }
+  .mm-card .state { position: absolute; left: 15px; right: 15px; bottom: 10px; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--c); white-space: nowrap; overflow: hidden; }
+  .mm-card .state .rec { color: var(--green); }
   .mm-card .stroke { width: 36px; height: 2px; border-radius: 2px; background: color-mix(in srgb, var(--c) 22%, transparent); position: relative; overflow: hidden; }
   .mm-card .stroke::after { content: ""; position: absolute; top: 0; bottom: 0; width: 14px; background: var(--c); border-radius: 2px; animation: mm-run 1.5s ease-in-out infinite alternate; }
   .mm-card.static.a { left: 4%; top: 100px; } .mm-card.static.b { right: 4%; bottom: 88px; }
@@ -394,6 +447,9 @@
   .sonar { position: relative; width: 14px; height: 14px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 12px var(--blue); }
   .sonar i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--blue); opacity: 0; animation: mm-ping 2.4s ease-out infinite; }
   .sonar i:nth-child(2) { animation-delay: .8s; } .sonar i:nth-child(3) { animation-delay: 1.6s; }
+  /* the first one, inviting the double-click that creates a card, in a brilliant red so it is not missed */
+  .mm-hint .sonar { --sonar: #ff1f3d; background: var(--sonar); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sonar) 25%, transparent), 0 0 18px var(--sonar), 0 0 36px color-mix(in srgb, var(--sonar) 55%, transparent); }
+  .mm-hint .sonar i { border-color: var(--sonar); border-width: 2.5px; }
   @keyframes mm-ping { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(5.5); opacity: 0; } }
   .mm-label { font-size: 15px; font-weight: 500; color: var(--muted); }
   .mm .touch { display: none; }
@@ -414,10 +470,11 @@
   .mm-panel .p-title { font-size: 28px; font-weight: 650; letter-spacing: -.018em; line-height: 1.12; margin: 2px 0 6px; }
   .mm-panel .ph { color: var(--muted); font-weight: 400; font-style: italic; }
   .mm-panel .p-state { font-size: 13px; font-weight: 600; color: var(--muted); }
-  .mm-panel .p-body { margin-top: 18px; font-size: 15.5px; line-height: 1.5; min-height: 4.5em; padding: 12px 14px; border-radius: 10px; background: var(--chip); border: 1px solid var(--line); }
+  .mm-panel .p-body { margin-top: 16px; flex: 1 1 auto; min-height: 4.5em; overflow-y: auto; scrollbar-width: thin; font-size: 14.5px; line-height: 1.5; padding: 12px 14px; border-radius: 10px; background: var(--chip); border: 1px solid var(--line); }
+  .mm-panel .p-body .txt { white-space: pre-wrap; }
   .mm-panel .p-body .ph { font-style: normal; }
   .mm-panel .caret { display: inline-block; width: 1.5px; height: 1.1em; margin-left: 1px; vertical-align: -.15em; background: var(--ink); animation: mm-blink 1s steps(1) infinite; }
-  .mm-panel .p-foot { margin-top: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .mm-panel .p-foot { margin-top: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
   .mm-panel .btn { border-radius: 10px; padding: 9px 16px; font-size: 15px; font-family: inherit; border: 0; cursor: pointer; color: var(--ink); transition: transform .12s, filter .12s; }
   .mm-panel .btn.primary { background: var(--blue); color: var(--on-ink); border-color: transparent; }
   .mm-panel .btn.pressed { transform: scale(.95); filter: brightness(.88); }
@@ -431,6 +488,10 @@
 
   @media (max-width: 760px) { .mm .hide-s { display: none !important; } }
   @media (max-width: 640px) { .mm { height: 480px; } .mm-card { --cw: 232px; --ch: 124px; } .mm-map { display: none; } .mm-panel .inner { padding: 22px 20px; } .mm-panel .p-title { font-size: 24px; } }
-  @media (prefers-reduced-motion: reduce) { .sonar i { animation: none; opacity: .4; transform: scale(2.5); } .mm-card, .mm-card.fresh, .mm-panel.anim, .mm-dim, .mm-panel .inner { animation: none; transition: none; }
-    .mm-card .stroke::after, .mm-panel .caret { animation: none; } .mm-pulse { animation: none; } }
+  /* reduced motion: the device's preference, or the toggle under the navbar (Base.astro) */
+  :root[data-motion="reduce"] .sonar i { animation: none; opacity: .4; transform: scale(2.5); }
+  :root[data-motion="reduce"] .sonar.mini i { display: none; }
+  :root[data-motion="reduce"] .mm-card, :root[data-motion="reduce"] .mm-card.fresh, :root[data-motion="reduce"] .mm-panel.anim, :root[data-motion="reduce"] .mm-dim, :root[data-motion="reduce"] .mm-panel .inner { animation: none; transition: none; }
+  :root[data-motion="reduce"] .mm-card .stroke::after, :root[data-motion="reduce"] .mm-panel .caret, :root[data-motion="reduce"] .mm-card .meta.tick { animation: none; }
+  :root[data-motion="reduce"] .mm-pulse { animation: none; }
 </style>

@@ -1,200 +1,987 @@
 ---
-// "Ensure quality with adversarial code reviews": the Review tab of an open card, as the app shows it
-// (design: Code reviews in Card lifecycle; detail.tsx FindingList / ReviewSubmit). Findings carry a severity,
-// an optional Security tag and file:line; per finding the owner picks "Fix it", "As a follow-up task" or "Ignore"
-// (a second click takes it back), then "Submit answers" to the current agent or "Submit to new agent" with a model choice.
-const findings = [
-  { id: 1, sev: 'critical', security: true, title: 'The theme from the URL is written into the page unescaped',
-    text: '`?theme=` goes straight into the toggle’s `innerHTML`, so a crafted link runs script in the visitor’s session.', where: 'src/toggle.ts:18', task: 'Escape the theme name from the URL' },
-  { id: 2, sev: 'major', title: 'A saved theme is never validated',
-    text: 'The value in `localStorage` is used as a class name. A stale or edited value leaves the page without any theme.', where: 'src/theme.ts:42', task: 'Validate the saved theme' },
-  { id: 3, sev: 'minor', title: 'The toggle has no accessible name',
-    text: 'It is an icon-only button; a screen reader announces just “button”.', where: 'src/ui/TopBar.tsx:77', task: 'Name the theme toggle' },
-  { id: 4, sev: 'info', title: 'The dark palette repeats two light tokens',
-    text: '`--line` and `--muted` are the same in both themes; probably an oversight, worth a look.', where: 'src/styles.css:31', task: 'Check the dark palette tokens' },
+// "Ensure quality with adversarial code reviews": the Review tab of the "Club page should show my attendance" card,
+// as the app draws it (obeya src/ui/detail.tsx ReviewList / ReviewSubmit, styles from src/ui/reviewClasses.ts).
+// The items are what a reviewer would raise on that card's real diff (Kinship, commit "Show attendance progress and a
+// Regulars badge on club pages"). Each has a severity badge in its colour; the tab counts what waits for the owner by
+// severity, each with its shape. Per item the owner picks "Fix it", "As a follow-up task" or "Ignore" (a second click
+// takes it back), then "Submit answers" or "Submit to new agent". Fixed items go Fixing → Under review → Fixed; items
+// that no longer wait fold to their head line with a status pill.
+interface Item {
+  n: number;
+  sev: "critical" | "major" | "minor" | "low" | "info";
+  security?: boolean;
+  title: string;
+  text: string;
+  where: string;
+  task: string;
+}
+
+const items: Item[] = [
+  {
+    n: 1,
+    sev: "critical",
+    security: true,
+    title: "Attendance streak endpoint leaks data",
+    text: "`GET /api/members/:id/streak` answers for whatever member id is in the URL and never checks who is asking. Anyone can read any member’s attendance, event by event, by counting through the ids.",
+    where: "src/features/members/server.ts:58",
+    task: "Check who is asking on the streak endpoint",
+  },
+  {
+    n: 2,
+    sev: "major",
+    title: "Cancelling an RSVP after the event erases the visit",
+    text: "`PUT /api/events/:id/rsvp` refuses events that have ended, but `DELETE` does not. Removing a past “going” lowers the attendance count, so a member can lose a Regulars badge they earned.",
+    where: "src/features/events/server.ts:176",
+    task: "Keep past RSVPs once an event has ended",
+  },
+  {
+    n: 3,
+    sev: "minor",
+    title: "Attendance aggregate is rerun for every club summary",
+    text: "`loadEventSummaries` now queries all of the member’s past RSVPs every time it runs. `loadClubSummaries` calls it once per club for the next event, so opening Discover repeats the same global aggregate for every club; club detail and Me repeat it further. Compute or pass the count map once per response, or scope the query to the club being loaded.",
+    where: "src/features/events/server.ts:99",
+    task: "Count attendance once per response",
+  },
+  {
+    n: 4,
+    sev: "info",
+    title: "Attendance counts “going” answers, not check-ins",
+    text: "Kinship has no check-in, so a member who said they would go and stayed home still counts. Worth revisiting if check-ins are added.",
+    where: "src/features/events/server.ts:52",
+    task: "Count check-ins instead of RSVPs",
+  },
 ];
-const md = (s: string) => s.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+const reviewer = "Codex · gpt-sol-6.1";
+// the schema-change page the demo skill renders (obeya plugin/skills/demo/lib/schema.ts), from a models JSON of
+// Kinship's tables before and after: attended counts on memberships, attended_at on RSVPs, and a member_badges table
+const schemaPage = "/video/kinship-attendance/schema-change.html";
+const schemaCaption = "Attendance counts on memberships, attended_at on RSVPs, and a new member_badges table";
+const md = (s: string) => s.replace(/`([^`]+)`/g, "<code>$1</code>");
 ---
-<div class="cr" id="cr">
-  <div class="cr-panel">
+<div class="cr" id="cr" data-reviewer={reviewer}>
+  <div class="cr-panel is-reviewing" id="cr-panel">
+    <button class="cr-replay-pill" id="cr-replay-btn" type="button" title="Replay the code review">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+      </svg>
+      Replay review
+    </button>
+
     <div class="cr-head">
       <div class="rv-kind">Task</div>
-      <div class="rv-title">Add dark mode</div>
-      <div class="rv-state">● Demo ready · reviewed by Claude Code · Opus 5.5</div>
-    </div>
-    <div class="cr-tabs" role="presentation" aria-hidden="true">
-      <span>Demo</span>
-      <span class="on">Review <span id="cr-counts"></span></span>
-      <span>Diff</span>
-    </div>
-
-    <h4 class="p-h" id="cr-heading" aria-live="polite">4 findings</h4>
-    <div id="cr-list">
-      {findings.map((f) => (
-        <div class={`finding ${f.sev}${f.security ? ' security' : ''}`} data-id={f.id} data-task={f.task}>
-          <div class="f-head">
-            <span class="f-no">{f.id}</span>
-            <span class={`f-sev ${f.sev}`}>{f.sev}</span>
-            <b>{f.title}</b>
-            {f.security && <span class="f-tag">Security</span>}
-          </div>
-          <div class="f-text" set:html={md(f.text)} />
-          <div class="f-where"><code>{f.where}</code></div>
-          <div class="f-slot">
-            <div class="choices f-choices" role="group" aria-label={`What to do about finding ${f.id}`}>
-              <button type="button" class="choice" data-route="fix" aria-pressed="false" title="The card’s agent fixes it and hands over again, with a new demo where the change shows">Fix it</button>
-              <button type="button" class="choice" data-route="later" aria-pressed="false" title="The agent makes it a task of its own that follows up on this card">As a follow-up task</button>
-              <button type="button" class="choice" data-route="ignore" aria-pressed="false" title="Not pursued, and not sent to the agent.">Ignore</button>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-    <p class="hint" id="cr-hint">Choose per finding, then submit your answers here or send them with a message to the agent.</p>
-
-    <div class="review-submit" id="cr-submit" hidden>
-      <button type="button" class="btn primary" id="cr-send"><span>Submit answers</span><small>Claude Code · Opus 5.5</small></button>
-      <div class="cr-newagent">
-        <button type="button" class="btn" id="cr-new" aria-haspopup="true" aria-expanded="false">Submit to new agent</button>
-        <div class="cr-menu" id="cr-menu" hidden role="group" aria-label="Choose an agent for this start">
-          <p>This will create a new session with items to fix as its only context.</p>
-          <label>Harness <select id="cr-harness"><option>Claude Code</option><option>Codex</option></select></label>
-          <label>Model <select id="cr-model"><option>Fable 5.1</option><option>Opus 5.5</option><option>Sonnet 5.5</option></select></label>
-          <label>Effort <select id="cr-effort"><option>Medium</option><option>High</option><option>Max</option></select></label>
-          <button type="button" class="btn primary" id="cr-go">Start with this choice</button>
-        </div>
+      <div class="rv-title">Club page should show my attendance, regulars</div>
+      <div class="rv-state reviewing" id="cr-state">
+        <span class="cr-state-dot">●</span> Agent reviewing
       </div>
     </div>
-    <button type="button" class="cr-reset" id="cr-reset" hidden>Replay the demo</button>
+    <div class="cr-tabs" role="tablist" aria-label="What the card brings">
+      <span class="cr-tab-off" aria-hidden="true">Demo</span>
+      <button type="button" role="tab" class="cr-tab" data-tab="schema" aria-selected="false" aria-controls="cr-schema" title={schemaCaption}>
+        <svg class="cr-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
+        Schema<span class="cr-long">&nbsp;change</span>
+      </button>
+      <button type="button" role="tab" class="cr-tab on" data-tab="review" aria-selected="true" aria-controls="cr-review">Review<span id="cr-counts"><span class="rv-running"></span></span></button>
+      <span class="cr-tab-off" aria-hidden="true">Diff</span>
+    </div>
+
+    <div class="cr-schema" id="cr-schema" role="tabpanel" aria-label="Schema change" hidden>
+      <p class="cr-schema-cap">{schemaCaption}</p>
+      <iframe id="cr-schema-frame" title="Schema change: attendance and the Regulars badge" data-src={schemaPage}></iframe>
+    </div>
+
+    <section class="findings" id="cr-review" role="tabpanel" aria-label="Review">
+      <div id="cr-busy">
+        <p class="rv-busy">Reviewing with {reviewer} …</p>
+        <p class="hint">A separate agent reviews this work’s diff against main. You can approve meanwhile.</p>
+      </div>
+      <h4 class="p-h" id="cr-heading" aria-live="polite" hidden></h4>
+
+      <div id="cr-list">
+        {items.map((i) => (
+          <div class={`finding ritem ${i.sev}${i.security ? " security" : ""} cr-hidden`} data-n={i.n} data-sev={i.sev} data-task={i.task}>
+            <button type="button" class="f-head" aria-expanded="true">
+              <span class="f-no">#{i.n}</span>
+              <span class={`f-sev ${i.sev}`}>{i.sev}</span>
+              <b>{i.title}</b>
+              {i.security && <span class="f-tag">Security</span>}
+              <span class="f-head-pill"></span>
+              <span class="f-chevron" aria-hidden="true">
+                <svg class="down" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                <svg class="right" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+              </span>
+            </button>
+            <div class="f-body">
+              <div class="f-text"><span set:html={md(i.text)} /> <span class="f-text-pill"></span></div>
+              <div class="f-where"><code>{i.where}</code></div>
+              <div class="f-slot">
+                <div class="choices single f-choices" role="group" aria-label={`What to do about item ${i.n}`}>
+                  <button type="button" class="choice" data-route="fix" aria-pressed="false" title="The card’s agent fixes it and hands over again, with a new demo where the change shows">Fix it</button>
+                  <button type="button" class="choice" data-route="later" aria-pressed="false" title="The agent makes it a task of its own that follows up on this card, bundled items as one; it starts at once.">As a follow-up task</button>
+                  <button type="button" class="choice" data-route="ignore" aria-pressed="false" title="Not pursued, and not sent to the agent.">Ignore</button>
+                </div>
+              </div>
+              <ol class="f-log"></ol>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p class="hint" id="cr-hint" hidden>Choose per item, then submit your answers here or send them with a message to the agent.</p>
+
+      <div class="review-submit" id="cr-submit" hidden>
+        <button type="button" class="btn primary" id="cr-send"><span>Submit answers</span><small>Claude Code · Opus 5.5</small></button>
+        <div class="cr-newagent">
+          <button type="button" class="btn" id="cr-new" aria-haspopup="true" aria-expanded="false">Submit to new agent</button>
+          <div class="cr-menu" id="cr-menu" hidden role="group" aria-label="Choose an agent for this start">
+            <p>This will create a new session with items to fix as its only context.</p>
+            <label>Harness <select id="cr-harness"><option>Claude Code</option><option>Codex</option></select></label>
+            <label>Model <select id="cr-model"><option>Fable 5.1</option><option>Opus 5.5</option><option>Sonnet 5.5</option></select></label>
+            <label>Effort <select id="cr-effort"><option>Medium</option><option>High</option><option>Max</option></select></label>
+            <button type="button" class="btn primary" id="cr-go">Start with this choice</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 
 <script>
-  const root = document.getElementById('cr')!;
-  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-  const items = [...root.querySelectorAll<HTMLElement>('.finding')];
-  const SEV_ORDER = ['critical', 'major', 'minor', 'info'];
-  type Route = 'fix' | 'later' | 'ignore';
-  type Status = 'open' | 'pending' | 'settled';
-  const state = new Map<number, { route: Route | null; status: Status }>();
-  const timers: number[] = [];
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const ids = (f: HTMLElement) => Number(f.dataset.id);
-  const initial = () => items.forEach((f) => state.set(ids(f), { route: null, status: 'open' }));
-  initial();
-  const originals = new Map(items.map((f) => [f, f.querySelector('.f-slot')!.innerHTML]));
+  import { onMotionChange, reducedMotion } from "../lib/motion";
+  type Sev = "critical" | "major" | "minor" | "low" | "info";
+  type Route = "fix" | "later" | "ignore";
+  type Status = "raised" | "fixing" | "underReview" | "fixed" | "closed" | "followUp";
+  interface ItemState {
+    route: Route | null;
+    status: Status;
+    log: string[];
+    flipped: boolean;
+    note: string;
+  }
 
-  function render() {
-    const open = items.filter((f) => state.get(ids(f))!.status !== 'settled');
-    const n = items.length;
-    $('cr-heading').textContent = open.length === 0 ? `${n} findings, all settled` : open.length === n ? `${n} findings` : `${open.length} of ${n} findings open`;
-    // the tab's open findings by severity, in colour; a green check when none is left
-    const counts = SEV_ORDER.map((s) => [s, open.filter((f) => f.classList.contains(s)).length] as const).filter(([, c]) => c > 0);
-    $('cr-counts').innerHTML = counts.length ? counts.map(([s, c]) => `<span class="rv-count ${s}">●${c}</span>`).join('') : '<span class="rv-clean" aria-label="No findings open">✓</span>';
-    const picked = items.filter((f) => { const s = state.get(ids(f))!; return s.status === 'open' && s.route; });
-    const undecided = items.some((f) => { const s = state.get(ids(f))!; return s.status === 'open' && !s.route; });
-    $('cr-hint').hidden = !undecided;
-    $('cr-submit').hidden = picked.length === 0;
+  const SEVERITIES: Sev[] = ["critical", "major", "minor", "low", "info"];
+  const STATUS_LABEL: Record<Status, string> = {
+    raised: "Raised",
+    fixing: "Fixing",
+    underReview: "Under review",
+    fixed: "Fixed",
+    closed: "Closed",
+    followUp: "Follow-up",
+  };
+  const STATUS_HINT: Record<Status, string> = {
+    raised: "The reviewer raised it; you decide",
+    fixing: "The agent is fixing it",
+    underReview: "The agent resubmitted it; the next review verifies it",
+    fixed: "The reviewer verified the fix",
+    closed: "You ignored it",
+    followUp: "It becomes a task of its own",
+  };
+
+  // the shapes of the severities (obeya src/ui/components/review-severity-icon.tsx), in their count's colour
+  const shape = (s: Sev): string => {
+    if (s === "info") {
+      return '<svg class="sev-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>';
+    }
+    const body = s === "low"
+      ? '<circle cx="8" cy="8" r="4"/>'
+      : s === "minor"
+        ? '<rect x="3" y="3" width="10" height="10"/>'
+        : s === "major"
+          ? '<path d="M8 1 15 8 8 15 1 8Z"/>'
+          : '<path d="M8 0 13 5 8 10 3 5Z M8 6 13 11 8 16 3 11Z"/>';
+    return `<svg class="sev-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">${body}</svg>`;
+  };
+  const CHECK = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+  const CLEAN = '<svg class="rv-clean" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="No items waiting for you"><path d="M20 6 9 17l-5-5"/></svg>';
+
+  const root = document.getElementById("cr")!;
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const list = $("cr-list");
+  const items = [...root.querySelectorAll<HTMLElement>(".finding")];
+  const reviewer = root.dataset.reviewer ?? "";
+  const numberOf = (f: HTMLElement) => Number(f.dataset.n);
+  const sevOf = (f: HTMLElement) => f.dataset.sev as Sev;
+  const originals = new Map(items.map((f) => [f, f.querySelector(".f-slot")!.innerHTML]));
+  const state = new Map<number, ItemState>();
+  let flowTimers: number[] = [];
+  let animTimers: number[] = [];
+  let reviewing = true;
+
+  const clock = () => new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const waits = (s: ItemState) => s.status === "raised";
+  const isOpen = (s: ItemState) => waits(s) !== s.flipped;
+
+  function reset() {
     items.forEach((f) => {
-      const s = state.get(ids(f))!;
-      f.querySelectorAll<HTMLElement>('.choice').forEach((b) => { const on = s.route === b.dataset.route; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+      state.set(numberOf(f), { route: null, status: "raised", log: [], flipped: false, note: "" });
+      f.querySelector(".f-slot")!.innerHTML = originals.get(f)!;
     });
   }
 
-  // a second click on a choice takes it back
-  root.addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>('.choice');
+  const pill = (status: Status) =>
+    `<span class="f-pill ${status}" title="${STATUS_HINT[status]}">${status === "fixed" ? CHECK : ""}${STATUS_LABEL[status]}</span>`;
+
+  /** Waiting items first by severity, then those being fixed or verified, then fixed, closed and follow-ups. */
+  function sortItems() {
+    const bySev = (a: HTMLElement, b: HTMLElement) => SEVERITIES.indexOf(sevOf(a)) - SEVERITIES.indexOf(sevOf(b)) || numberOf(a) - numberOf(b);
+    const byNo = (a: HTMLElement, b: HTMLElement) => numberOf(a) - numberOf(b);
+    const of = (statuses: Status[]) => items.filter((f) => statuses.includes(state.get(numberOf(f))!.status));
+    const sorted = [
+      ...of(["raised"]).sort(bySev),
+      ...of(["fixing", "underReview"]).sort(byNo),
+      ...of(["fixed"]).sort(byNo),
+      ...of(["closed"]).sort(byNo),
+      ...of(["followUp"]).sort(byNo),
+    ];
+    sorted.forEach((f) => list.appendChild(f));
+  }
+
+  function counts(visible: HTMLElement[]) {
+    const waiting = visible.filter((f) => waits(state.get(numberOf(f))!));
+    const busy = visible.some((f) => ["fixing", "underReview"].includes(state.get(numberOf(f))!.status));
+    const bySev = SEVERITIES.map((s) => [s, waiting.filter((f) => sevOf(f) === s).length] as const).filter(([, c]) => c > 0);
+    if (!bySev.length) return busy ? "" : CLEAN;
+    return bySev.map(([s, c]) => `<span class="rv-count ${s}">${shape(s)}${c}</span>`).join("");
+  }
+
+  function heading(total: number, open: number) {
+    const n = total === 1 ? "1 item" : `${total} items`;
+    if (open === total) return n;
+    if (open === 0) return `${n}, none waiting for you`;
+    return `${open} of ${total} items wait for you`;
+  }
+
+  function renderItem(f: HTMLElement) {
+    const s = state.get(numberOf(f))!;
+    const open = isOpen(s);
+    f.classList.toggle("settled", !waits(s));
+    f.classList.toggle("folded", !open);
+    f.querySelector(".f-head")!.setAttribute("aria-expanded", String(open));
+    f.querySelector(".f-head")!.setAttribute("title", open ? "Hide details" : "Show details");
+    f.querySelector(".f-head-pill")!.innerHTML = open ? "" : pill(s.status);
+    f.querySelector(".f-text-pill")!.innerHTML = open ? pill(s.status) : "";
+    f.querySelector(".f-log")!.innerHTML = s.log.map((l) => `<li>${l}</li>`).join("");
+    if (waits(s)) {
+      f.querySelectorAll<HTMLElement>(".choice").forEach((b) => {
+        const on = s.route === b.dataset.route;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+    } else {
+      f.querySelector(".f-slot")!.innerHTML = s.note ? `<div class="f-status${s.status === "fixing" ? " pending" : ""}">${s.note}</div>` : "";
+    }
+  }
+
+  function render() {
+    items.forEach(renderItem);
+    if (reviewing) return;
+    const all = items.map((f) => state.get(numberOf(f))!);
+    const waiting = all.filter(waits);
+    $("cr-heading").textContent = heading(items.length, waiting.length);
+    $("cr-counts").innerHTML = counts(items);
+    $("cr-hint").hidden = !waiting.some((s) => !s.route);
+    $("cr-submit").hidden = !waiting.some((s) => s.route);
+    const stateLine = $("cr-state");
+    if (waiting.length) {
+      stateLine.className = "rv-state waiting";
+      stateLine.innerHTML = '<span class="cr-state-dot">●</span> Demo ready · review items wait for you';
+    } else if (all.some((s) => s.status === "fixing" || s.status === "underReview")) {
+      stateLine.className = "rv-state working";
+      stateLine.innerHTML = '<span class="cr-state-dot">●</span> Agent at work · fixing review items';
+    } else {
+      stateLine.className = "rv-state approved";
+      stateLine.innerHTML = '<span class="cr-state-dot">●</span> Demo ready · review settled';
+    }
+  }
+
+  const clear = (timers: number[]) => { timers.forEach(clearTimeout); return []; };
+
+  function startReview() {
+    animTimers = clear(animTimers);
+    flowTimers = clear(flowTimers);
+    reset();
+    reviewing = true;
+    sortItems();
+    $("cr-panel").classList.add("is-reviewing");
+    $("cr-state").className = "rv-state reviewing";
+    $("cr-state").innerHTML = '<span class="cr-state-dot">●</span> Agent reviewing';
+    $("cr-counts").innerHTML = '<span class="rv-running"></span>';
+    $("cr-busy").hidden = false;
+    $("cr-heading").hidden = true;
+    $("cr-hint").hidden = true;
+    $("cr-submit").hidden = true;
+    items.forEach((f) => f.classList.add("cr-hidden"));
+    closeMenu();
+    render();
+
+    const finish = () => {
+      $("cr-busy").hidden = true;
+      $("cr-heading").hidden = false;
+      $("cr-panel").classList.remove("is-reviewing");
+      const at = clock();
+      items.forEach((f) => { state.get(numberOf(f))!.log = [`${at} · reviewer · Raised`]; });
+    };
+
+    if (reducedMotion()) {
+      finish();
+      items.forEach((f) => f.classList.remove("cr-hidden"));
+      reviewing = false;
+      render();
+      return;
+    }
+
+    animTimers.push(window.setTimeout(() => {
+      finish();
+      render();
+      items.forEach((f, idx) => {
+        animTimers.push(window.setTimeout(() => {
+          f.classList.remove("cr-hidden");
+          f.classList.add("cr-pop");
+          f.addEventListener("animationend", () => f.classList.remove("cr-pop"), { once: true });
+          const visible = items.slice(0, idx + 1);
+          $("cr-heading").textContent = heading(visible.length, visible.length);
+          $("cr-counts").innerHTML = counts(visible);
+          if (idx === items.length - 1) {
+            animTimers.push(window.setTimeout(() => { reviewing = false; render(); }, 300));
+          }
+        }, idx * 300));
+      });
+    }, 2400));
+  }
+
+  // trigger the review when the section scrolls into view
+  const observer = new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting)) {
+      observer.disconnect();
+      startReview();
+    }
+  }, { threshold: 0.15 });
+  observer.observe(root);
+
+  // the tabs: Review, and the schema-change page, loaded the first time it is opened. Opening it keeps the card
+  // the height it had: the frame takes what the review took (never under SCHEMA_MIN) and scrolls inside
+  const frame = $<HTMLIFrameElement>("cr-schema-frame");
+  const SCHEMA_MIN = 280;
+  const panel = $("cr-panel");
+  const fitFrame = (panelHeight: number) => {
+    const reserved = panel.style.minHeight;
+    panel.style.minHeight = "";
+    const frameHeight = frame.offsetHeight + panelHeight - panel.offsetHeight;
+    panel.style.minHeight = reserved;
+    frame.style.height = `${Math.max(SCHEMA_MIN, frameHeight)}px`;
+  };
+
+  // the card starts as tall as it gets: every item raised and open, with the answers ready to submit. A hidden copy
+  // of the card at its width is put in that state and measured, so the section never grows while the review plays
+  function fullHeight() {
+    const copy = panel.cloneNode(true) as HTMLElement;
+    const part = (id: string) => copy.querySelector<HTMLElement>(`#${id}`)!;
+    copy.classList.remove("is-reviewing");
+    part("cr-schema").hidden = true;
+    part("cr-review").hidden = false;
+    part("cr-busy").hidden = true;
+    part("cr-heading").hidden = false;
+    part("cr-heading").textContent = heading(items.length, items.length);
+    part("cr-state").innerHTML = '<span class="cr-state-dot">●</span> Demo ready · review items wait for you';
+    part("cr-counts").innerHTML = SEVERITIES
+      .map((sev) => [sev, items.filter((f) => sevOf(f) === sev).length] as const)
+      .filter(([, n]) => n > 0)
+      .map(([sev, n]) => `<span class="rv-count ${sev}">${shape(sev)}${n}</span>`)
+      .join("");
+    copy.querySelectorAll<HTMLElement>(".finding").forEach((f) => {
+      f.classList.remove("cr-hidden", "cr-pop", "settled", "folded");
+      const original = items.find((i) => i.dataset.n === f.dataset.n)!;
+      f.querySelector(".f-slot")!.innerHTML = originals.get(original)!;
+      f.querySelector(".choice")!.classList.add("on");
+      f.querySelector(".f-head-pill")!.innerHTML = "";
+      f.querySelector(".f-text-pill")!.innerHTML = pill("raised");
+      f.querySelector(".f-log")!.innerHTML = `<li>${clock()} · reviewer · Raised</li>`;
+    });
+    part("cr-menu").hidden = true;
+    // the hint shows while an item has no answer yet, the submit buttons once any has one: at most, both
+    part("cr-hint").hidden = false;
+    part("cr-submit").hidden = false;
+    copy.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+    copy.removeAttribute("id");
+    Object.assign(copy.style, { position: "absolute", left: "0", top: "0", width: `${panel.offsetWidth}px`, minHeight: "0", visibility: "hidden", pointerEvents: "none" });
+    copy.setAttribute("aria-hidden", "true");
+    root.appendChild(copy);
+    const height = copy.offsetHeight;
+    copy.remove();
+    return height;
+  }
+  let reservedWidth = 0;
+  const reserve = () => {
+    if (panel.offsetWidth === reservedWidth) return;
+    reservedWidth = panel.offsetWidth;
+    panel.style.minHeight = `${fullHeight()}px`;
+  };
+  new ResizeObserver(reserve).observe(root);
+  document.fonts?.ready.then(() => { reservedWidth = 0; reserve(); });
+  // the page darkens by prefers-color-scheme, which a frame takes from the system, not from the site's toggle:
+  // its styles follow the toggle instead (`all` forces the dark look, `not all` the light one)
+  const originalStyles = new WeakMap<HTMLStyleElement, string>();
+  const syncTheme = () => {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    const theme = document.documentElement.dataset.theme;
+    doc.querySelectorAll("style").forEach((style) => {
+      if (!originalStyles.has(style)) originalStyles.set(style, style.textContent ?? "");
+      const css = originalStyles.get(style)!;
+      style.textContent = theme ? css.replace(/@media\s*\(prefers-color-scheme:\s*dark\)/g, theme === "dark" ? "@media all" : "@media not all") : css;
+    });
+  };
+  new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  frame.addEventListener("load", () => {
+    syncTheme();
+    // a link in the page opens outside the demo
+    frame.contentDocument?.querySelectorAll("a[href]").forEach((a) => a.setAttribute("target", "_blank"));
+  });
+  function showTab(tab: string) {
+    const panelHeight = panel.offsetHeight;
+    root.querySelectorAll<HTMLElement>(".cr-tab").forEach((b) => {
+      const on = b.dataset.tab === tab;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-selected", String(on));
+    });
+    $("cr-review").hidden = tab !== "review";
+    $("cr-schema").hidden = tab !== "schema";
+    if (tab === "schema") {
+      fitFrame(panelHeight);
+      if (!frame.getAttribute("src")) frame.src = frame.dataset.src!;
+    }
+  }
+  root.querySelectorAll<HTMLElement>(".cr-tab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab!)));
+
+  $("cr-replay-btn").addEventListener("click", () => { showTab("review"); startReview(); });
+
+  // reduced motion turned on while it reviews: the finished review at once
+  onMotionChange((reduced) => { if (reduced && reviewing) startReview(); });
+
+  root.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    // a click on an item's head folds or unfolds it
+    const head = target.closest<HTMLElement>(".f-head");
+    if (head) {
+      const s = state.get(numberOf(head.closest<HTMLElement>(".finding")!))!;
+      s.flipped = !s.flipped;
+      render();
+      return;
+    }
+    // a second click on a choice takes it back
+    const b = target.closest<HTMLElement>(".choice");
     if (!b) return;
-    const f = b.closest<HTMLElement>('.finding')!; const s = state.get(ids(f))!;
-    if (s.status !== 'open') return;
+    const s = state.get(numberOf(b.closest<HTMLElement>(".finding")!))!;
+    if (!waits(s)) return;
     s.route = s.route === b.dataset.route ? null : (b.dataset.route as Route);
     render();
   });
 
-  const status = (f: HTMLElement, html: string, cls = '') => { f.querySelector('.f-slot')!.innerHTML = `<div class="f-status ${cls}">${html}</div>`; };
-  const later = (cb: () => void, ms: number) => { timers.push(window.setTimeout(cb, reduce ? Math.min(ms, 200) : ms)); };
+  const later = (cb: () => void, ms: number) => { flowTimers.push(window.setTimeout(() => { cb(); sortItems(); render(); }, reducedMotion() ? Math.min(ms, 200) : ms)); };
+  const move = (s: ItemState, to: Status, who: string, what = STATUS_LABEL[to]) => {
+    s.status = to;
+    s.flipped = false;
+    s.log.push(`${clock()} · ${who} · ${what}`);
+  };
 
   function submit(who: string) {
     for (const f of items) {
-      const s = state.get(ids(f))!;
-      if (s.status !== 'open' || !s.route) continue;
-      const route = s.route; s.status = 'pending';
-      if (route === 'ignore') { s.status = 'settled'; f.classList.add('settled'); status(f, 'Ignored'); continue; }
-      if (route === 'fix') {
-        status(f, `${who} fixes it …`, 'pending');
-        later(() => { s.status = 'settled'; f.classList.add('settled'); status(f, 'Fixed by the agent'); render(); }, 2200);
+      const s = state.get(numberOf(f))!;
+      if (!waits(s) || !s.route) continue;
+      if (s.route === "ignore") {
+        move(s, "closed", "owner");
+        s.note = "";
+      } else if (s.route === "later") {
+        move(s, "followUp", "owner");
+        s.note = "The agent makes it a task …";
+        later(() => {
+          s.log.push(`${clock()} · worker · Follow-up task made`);
+          s.note = `<a href="#mind-map">Follow-up task “${f.dataset.task}” →</a>`;
+        }, 1600);
       } else {
-        status(f, 'Becoming a follow-up task …', 'pending');
-        later(() => { s.status = 'settled'; f.classList.add('settled'); status(f, `Follow-up task “${f.dataset.task}” →`); render(); }, 1600);
+        move(s, "fixing", "owner");
+        s.note = `${who} fixes it …`;
+        later(() => { move(s, "underReview", "worker", "Resubmitted → Under review"); s.note = ""; }, 2600);
+        later(() => { move(s, "fixed", "reviewer", "✓ Fixed"); }, 4400);
       }
     }
-    closeMenu(); render(); $('cr-reset').hidden = false;
+    closeMenu();
+    sortItems();
+    render();
   }
 
-  const closeMenu = () => { $('cr-menu').hidden = true; $('cr-new').setAttribute('aria-expanded', 'false'); };
-  $('cr-send').addEventListener('click', () => submit('The agent'));
-  $('cr-new').addEventListener('click', () => { const h = $('cr-menu').hidden; $('cr-menu').hidden = !h; $('cr-new').setAttribute('aria-expanded', String(h)); });
-  $('cr-go').addEventListener('click', () => submit(`A new agent (${($('cr-model') as HTMLSelectElement).value})`));
-  document.addEventListener('click', (e) => { if (!(e.target as HTMLElement).closest('.cr-newagent')) closeMenu(); });
-  addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
-
-  $('cr-reset').addEventListener('click', () => {
-    timers.splice(0).forEach(clearTimeout);
-    initial();
-    items.forEach((f) => { f.classList.remove('settled'); f.querySelector('.f-slot')!.innerHTML = originals.get(f)!; });
-    $('cr-reset').hidden = true; render();
+  const closeMenu = () => { $("cr-menu").hidden = true; $("cr-new").setAttribute("aria-expanded", "false"); };
+  $("cr-send").addEventListener("click", () => submit("The agent"));
+  $("cr-new").addEventListener("click", () => {
+    const opening = $("cr-menu").hidden;
+    $("cr-menu").hidden = !opening;
+    $("cr-new").setAttribute("aria-expanded", String(opening));
   });
+  $("cr-go").addEventListener("click", () => submit(`A new agent (${$<HTMLSelectElement>("cr-model").value})`));
+  document.addEventListener("click", (e) => { if (!(e.target as HTMLElement).closest(".cr-newagent")) closeMenu(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+
+  reset();
   render();
 </script>
 
 <style is:global>
-  .cr-panel { position: relative; border-radius: 14px; background: var(--panel); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift); padding: 26px 30px 24px; text-align: left; }
-  .cr-panel::before { content: ""; position: absolute; left: 30px; top: -1px; width: 80px; height: 3px; border-radius: 0 0 3px 3px; background: var(--amber); box-shadow: 0 0 12px var(--amber); }
-  .cr-tabs { display: flex; gap: 22px; margin: 18px 0 4px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
-  .cr-tabs > span { padding: 6px 0 9px; margin-bottom: -1px; border-bottom: 2px solid transparent; }
-  .cr-tabs > span.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
-  .cr .p-h { margin: 18px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
-  .cr .rv-count { margin-left: 6px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--sev); }
-  .cr .rv-clean { margin-left: 6px; color: var(--green); font-weight: 700; }
-  .cr .rv-count, .cr .f-sev { --sev: #a17e00; }
-  .cr .rv-count.critical, .cr .f-sev.critical { --sev: #d00018; } .cr .rv-count.major, .cr .f-sev.major { --sev: #b93643; }
-  .cr .rv-count.minor, .cr .f-sev.minor { --sev: var(--amber); } .cr .rv-count.info, .cr .f-sev.info { --sev: var(--muted); }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cr .rv-count.critical { --sev: #ff818c; } :root:not([data-theme="light"]) .cr .rv-count.major { --sev: #f4a0aa; } }
-  :root[data-theme="dark"] .cr .rv-count.critical { --sev: #ff818c; } :root[data-theme="dark"] .cr .rv-count.major { --sev: #f4a0aa; }
+  /* The app's palette (Tailwind 4's), as obeya's src/ui/tailwind.css and reviewClasses.ts use it: state colours are a
+     palette's -600 / -100 / -800 in light and -400 / -950 / -200 in dark; severities and status pills as in the app. */
+  .cr {
+    --red-600: oklch(57.7% 0.245 27.325);
+    --cr-reviewing: oklch(60% 0.118 184.704); /* teal-600 */
+    --cr-reviewing-strong: oklch(43.7% 0.078 188.216); /* teal-800 */
+    --cr-waiting: oklch(64.6% 0.222 41.116); /* orange-600 */
+    --cr-working: oklch(54.6% 0.245 262.881); /* blue-600 */
+    --cr-approved: oklch(52.7% 0.154 150.069); /* green-700 */
+    --cr-asking: oklch(55.4% 0.135 66.442); /* yellow-700 */
+    --cr-destructive: var(--red-600);
 
-  .cr .finding { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--card); font-size: 13.5px; transition: opacity .25s; }
-  .cr .finding.security { border-color: color-mix(in srgb, var(--pink) 50%, var(--line)); }
+    --sev-critical: var(--red-600);
+    --count-critical: var(--red-600);
+    --sev-major: oklch(51.4% 0.222 16.935); /* rose-700 */
+    --count-major: oklch(51.4% 0.222 16.935);
+    --ink-major: oklch(45.5% 0.188 13.697); /* rose-800 */
+    --ink-minor: oklch(47% 0.157 37.304); /* orange-800 */
+    --ink-low: oklch(47.6% 0.114 61.907); /* yellow-800 */
+
+    --pill-raised-ink: oklch(45.5% 0.188 13.697); /* rose-800 on rose-600/14 */
+    --pill-raised-bg: color-mix(in oklab, oklch(58.6% 0.253 17.585) 14%, transparent);
+    --pill-fixing-ink: oklch(98.4% 0.014 180.72); /* teal-50 on teal-800 */
+    --pill-fixing-bg: oklch(43.7% 0.078 188.216);
+    --pill-review-ink: oklch(44.3% 0.11 240.79); /* sky-800 on sky-100 */
+    --pill-review-bg: oklch(95.1% 0.026 236.824);
+    --pill-fixed-ink: oklch(44.8% 0.119 151.328); /* green-800 on green-100 */
+    --pill-fixed-bg: oklch(96.2% 0.044 156.743);
+    --pill-follow-ink: oklch(43.2% 0.232 292.759); /* violet-800 on violet-100 */
+    --pill-follow-bg: oklch(94.3% 0.029 294.588);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .cr {
+      --cr-reviewing: oklch(77.7% 0.152 181.912);
+      --cr-reviewing-strong: oklch(91% 0.096 180.426);
+      --cr-waiting: oklch(75% 0.183 55.934);
+      --cr-working: oklch(70.7% 0.165 254.624);
+      --cr-approved: oklch(79.2% 0.209 151.711);
+      --cr-asking: oklch(85.2% 0.199 91.936);
+      --cr-destructive: oklch(70.4% 0.191 22.216);
+      --count-critical: oklch(80.8% 0.114 19.571);
+      --count-major: oklch(81% 0.117 11.638);
+      --ink-major: oklch(81% 0.117 11.638);
+      --ink-minor: oklch(83.7% 0.128 66.29);
+      --ink-low: oklch(85.2% 0.199 91.936);
+      --pill-raised-ink: oklch(81% 0.117 11.638);
+      --pill-review-ink: oklch(82.8% 0.111 230.318);
+      --pill-review-bg: oklch(29.3% 0.066 243.157);
+      --pill-fixed-ink: oklch(87.1% 0.15 154.449);
+      --pill-fixed-bg: oklch(26.6% 0.065 152.934);
+      --pill-follow-ink: oklch(81.1% 0.111 293.571);
+      --pill-follow-bg: oklch(28.3% 0.141 291.089);
+    }
+  }
+  :root[data-theme="dark"] .cr {
+    --cr-reviewing: oklch(77.7% 0.152 181.912);
+    --cr-reviewing-strong: oklch(91% 0.096 180.426);
+    --cr-waiting: oklch(75% 0.183 55.934);
+    --cr-working: oklch(70.7% 0.165 254.624);
+    --cr-approved: oklch(79.2% 0.209 151.711);
+    --cr-asking: oklch(85.2% 0.199 91.936);
+    --cr-destructive: oklch(70.4% 0.191 22.216);
+    --count-critical: oklch(80.8% 0.114 19.571);
+    --count-major: oklch(81% 0.117 11.638);
+    --ink-major: oklch(81% 0.117 11.638);
+    --ink-minor: oklch(83.7% 0.128 66.29);
+    --ink-low: oklch(85.2% 0.199 91.936);
+    --pill-raised-ink: oklch(81% 0.117 11.638);
+    --pill-review-ink: oklch(82.8% 0.111 230.318);
+    --pill-review-bg: oklch(29.3% 0.066 243.157);
+    --pill-fixed-ink: oklch(87.1% 0.15 154.449);
+    --pill-fixed-bg: oklch(26.6% 0.065 152.934);
+    --pill-follow-ink: oklch(81.1% 0.111 293.571);
+    --pill-follow-bg: oklch(28.3% 0.141 291.089);
+  }
+
+  .cr-panel {
+    position: relative;
+    border-radius: 14px;
+    background: var(--panel);
+    border: 1px solid var(--glass-edge);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift);
+    padding: 26px 30px 24px;
+    text-align: left;
+  }
+  .cr-panel::before {
+    content: "";
+    position: absolute;
+    left: 30px;
+    top: -1px;
+    width: 80px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--cr-stripe, var(--cr-waiting));
+    box-shadow: 0 0 12px var(--cr-stripe, var(--cr-waiting));
+    transition: background .5s ease, box-shadow .5s ease;
+  }
+  .cr-panel.is-reviewing { --cr-stripe: var(--cr-reviewing); }
+
+  .cr-replay-pill {
+    position: absolute;
+    right: 24px;
+    top: 22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--glass-edge);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow);
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform .15s, color .15s, background .15s;
+    z-index: 2;
+  }
+  .cr-replay-pill:hover { color: var(--ink); transform: translateY(-1px); background: var(--glass); }
+
+  .cr .rv-state {
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--cr-waiting);
+    transition: color .4s ease;
+  }
+  .cr .rv-state.reviewing { color: var(--cr-reviewing); }
+  .cr .rv-state.working { color: var(--cr-working); }
+  .cr .rv-state.approved { color: var(--cr-approved); }
+  .cr-state-dot { font-size: 11px; line-height: 1; }
+
+  .cr-tabs {
+    display: flex;
+    gap: 22px;
+    margin: 18px 0 4px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .cr-tabs > * {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    padding: 6px 0 9px;
+    margin-bottom: -1px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    font: inherit;
+    color: inherit;
+  }
+  .cr-tabs > .cr-tab { cursor: pointer; }
+  .cr-tabs > .cr-tab:hover { color: var(--ink); }
+  .cr-tabs > .on { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+  .cr .cr-db { width: 14px; height: 14px; margin-right: 6px; flex: none; }
+
+  /* the schema-change page, in a frame as tall as the review was (it scrolls inside); it takes the site's light or dark look */
+  .cr-schema { margin: 12px 0 4px; }
+  .cr-schema-cap { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
+  .cr-schema iframe {
+    display: block;
+    width: 100%;
+    height: 640px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cr-schema iframe { color-scheme: dark; } }
+  :root[data-theme="dark"] .cr-schema iframe { color-scheme: dark; }
+
+  /* the tab: a breathing dot while the review runs, then what waits for the owner by severity, or a check */
+  .cr .rv-running {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-left: 7px;
+    vertical-align: middle;
+    border-radius: 50%;
+    background: var(--cr-reviewing);
+    animation: cr-arranging 1.2s ease-in-out infinite;
+  }
+  @keyframes cr-arranging { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  .cr .rv-count {
+    margin-left: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--sev);
+  }
+  .cr .rv-count.critical { --sev: var(--count-critical); }
+  .cr .rv-count.major { --sev: var(--count-major); }
+  .cr .rv-count.minor { --sev: var(--cr-waiting); }
+  .cr .rv-count.low { --sev: var(--cr-asking); }
+  .cr .rv-count.info { --sev: var(--muted); }
+  .cr .sev-icon { width: 14px; height: 14px; flex: none; }
+  .cr .rv-clean { width: 16px; height: 16px; margin-left: 6px; vertical-align: middle; color: var(--cr-approved); }
+
+  .cr .findings { margin: 10px 0 12px; font-size: 13px; }
+  .cr .rv-busy {
+    margin: 4px 0;
+    font-weight: 600;
+    color: var(--cr-reviewing-strong);
+    animation: cr-arranging 1.6s ease-in-out infinite;
+  }
+  .cr .p-h {
+    margin: 8px 0 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .cr .hint { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+  .cr [hidden] { display: none !important; }
+
+  /* one item, framed; settled ones faded and folded to their head line */
+  .cr .finding {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: var(--card);
+    transition: opacity .25s;
+  }
+  .cr .finding.security { border-color: color-mix(in oklab, var(--cr-destructive) 50%, transparent); }
   .cr .finding.settled { opacity: .7; }
-  .cr .f-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; font-size: 14.5px; }
-  .cr .f-no { color: var(--muted); font-variant-numeric: tabular-nums; }
-  .cr .f-sev { align-self: center; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 4px; color: var(--sev); background: color-mix(in srgb, var(--sev) 16%, transparent); }
-  .cr .f-sev.critical { color: #fff; background: #d00018; }
-  .cr .f-tag { font-size: 11px; color: var(--pink); border: 1px solid currentColor; border-radius: 8px; padding: 0 6px; }
-  .cr .f-text { margin-top: 4px; line-height: 1.45; }
-  .cr .f-text code, .cr .f-where code { font: .92em var(--mono); background: var(--chip); border-radius: 4px; padding: 0 .3em; }
-  .cr .f-where { margin-top: 4px; font-size: 12px; color: var(--muted); }
-  .cr .f-status { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
-  .cr .f-status.pending { color: var(--blue); }
-  .cr .choices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .cr .choice { display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 9px; font: inherit; font-size: 13.5px; color: var(--ink); cursor: pointer;
-    background: var(--card); border: 1px solid var(--line); border-radius: 8px; transition: border-color .12s, background .12s; }
-  .cr .choice:hover { border-color: var(--muted); }
-  .cr .choice::before { content: ""; flex: none; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--muted); background: var(--card); }
-  .cr .choice.on { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 9%, var(--card)); }
-  .cr .choice.on::before { border-color: var(--amber); background: radial-gradient(var(--amber) 0 3.5px, var(--card) 4px); }
-  .cr .hint { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
-  .cr .hint[hidden], .cr [hidden] { display: none !important; }
+  .cr .finding.folded { padding-top: 6px; padding-bottom: 6px; }
+  .cr .finding.folded .f-body { display: none; }
+  .cr .finding.cr-hidden { display: none; }
+  .cr .finding.cr-pop { animation: cr-pop .38s cubic-bezier(.2, .9, .3, 1.25) both; }
+  @keyframes cr-pop {
+    0% { opacity: 0; transform: translateY(12px) scale(.97); }
+    70% { opacity: 1; transform: translateY(-2px) scale(1.006); }
+    100% { opacity: 1; transform: none; }
+  }
 
-  .cr .review-submit { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
-  .cr .review-submit .btn { border: 0; border-radius: 10px; padding: 8px 16px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--chip); color: var(--ink); height: 100%; }
-  .cr .review-submit .btn.primary { background: var(--blue); color: var(--on-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; }
+  .cr .f-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+  }
+  .cr .f-head b { font-weight: 600; min-width: 0; }
+  .cr .f-tag {
+    align-self: center;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--cr-destructive);
+    border: 1px solid currentColor;
+    border-radius: 8px;
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+  .cr .f-no { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cr .f-chevron { margin-left: auto; align-self: center; display: flex; color: var(--muted); }
+  .cr .f-head:hover .f-chevron { color: var(--ink); }
+  .cr .f-head[aria-expanded="true"] .right, .cr .f-head[aria-expanded="false"] .down { display: none; }
+  .cr .f-head-pill:empty, .cr .f-text-pill:empty { display: none; }
+
+  /* the severity badge: its colour at 16% behind, text in its ink; critical solid red */
+  .cr .f-sev {
+    align-self: center;
+    font-size: 11px;
+    line-height: 16px;
+    padding: 0 5px;
+    border-radius: 4px;
+    color: var(--badge-ink, var(--sev));
+    background: color-mix(in oklab, var(--sev) 16%, transparent);
+  }
+  .cr .f-sev.critical { color: #fff; background: var(--sev-critical); }
+  .cr .f-sev.major { --sev: var(--sev-major); --badge-ink: var(--ink-major); }
+  .cr .f-sev.minor { --sev: var(--cr-waiting); --badge-ink: var(--ink-minor); }
+  .cr .f-sev.low { --sev: var(--cr-asking); --badge-ink: var(--ink-low); }
+  .cr .f-sev.info { --sev: var(--muted); --badge-ink: var(--ink); }
+
+  /* an item's status: a rounded pill in its colours */
+  .cr .f-pill {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    line-height: 16px;
+    border-radius: 9px;
+    padding: 0 7px;
+    white-space: nowrap;
+    color: var(--ink);
+    background: var(--chip);
+  }
+  .cr .f-text .f-pill { margin-left: 4px; vertical-align: 1px; }
+  .cr .f-pill.raised { color: var(--pill-raised-ink); background: var(--pill-raised-bg); }
+  .cr .f-pill.fixing { position: relative; margin-right: 30px; color: var(--pill-fixing-ink); background: var(--pill-fixing-bg); }
+  .cr .f-pill.underReview { color: var(--pill-review-ink); background: var(--pill-review-bg); }
+  .cr .f-pill.fixed { color: var(--pill-fixed-ink); background: var(--pill-fixed-bg); }
+  .cr .f-pill.closed { color: var(--muted); background: var(--chip); }
+  .cr .f-pill.followUp { color: var(--pill-follow-ink); background: var(--pill-follow-bg); }
+  /* the line drawn after "Fixing" while the agent is on it */
+  .cr .f-pill.fixing::before, .cr .f-pill.fixing::after {
+    content: "";
+    position: absolute;
+    left: calc(100% + 5px);
+    top: calc(50% - 1px);
+    width: 24px;
+    height: 2px;
+    background: color-mix(in oklab, var(--pill-fixing-bg) 22%, transparent);
+  }
+  .cr .f-pill.fixing::after {
+    background: var(--pill-fixing-bg);
+    clip-path: inset(0);
+    animation: cr-draw 1.6s cubic-bezier(.5, 0, .3, 1) infinite;
+  }
+  @keyframes cr-draw {
+    0% { clip-path: inset(0 100% 0 0); }
+    55% { clip-path: inset(0 0 0 0); }
+    100% { clip-path: inset(0 0 0 100%); }
+  }
+
+  .cr .f-text { margin-top: 3px; line-height: 1.4; color: var(--ink); }
+  .cr .f-text code, .cr .f-where code {
+    font: .92em var(--mono);
+    background: var(--chip);
+    border-radius: 4px;
+    padding: 0 .3em;
+  }
+  .cr .f-where { margin-top: 3px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .cr .f-status { margin-top: 5px; font-size: 12px; color: var(--muted); }
+  .cr .f-status.pending { color: var(--cr-working); }
+  .cr .f-status a { color: var(--cr-working); text-underline-offset: 2px; }
+  .cr .f-log {
+    margin: 6px 0 0;
+    padding: 4px 0 0;
+    border-top: 1px solid var(--line);
+    list-style: none;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .cr .f-log:empty { display: none; }
+
+  /* the options: radio marks, the picked one in the waiting colour */
+  .cr .choices { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; margin-top: 6px; }
+  .cr .choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 5px 11px 5px 9px;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .cr .choice:hover { border-color: var(--muted); }
+  .cr .choice::before {
+    content: "";
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-top: 2px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px solid var(--muted);
+    background: var(--card);
+  }
+  .cr .choice.on, .cr .choice.on:hover {
+    border-color: var(--cr-waiting);
+    background: color-mix(in oklab, var(--cr-waiting) 8%, var(--card));
+  }
+  .cr .choice.on::before {
+    border-color: var(--cr-waiting);
+    background: radial-gradient(var(--cr-waiting) 0 3.5px, var(--card) 4px);
+  }
+
+  .cr .review-submit { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
+  .cr .review-submit .btn {
+    border: 0;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--chip);
+    color: var(--ink);
+    height: 100%;
+  }
+  .cr .review-submit .btn.primary {
+    background: var(--blue);
+    color: var(--on-ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.15;
+  }
   .cr .review-submit .btn small { font-size: 9.5px; font-weight: 400; opacity: .85; }
   .cr-newagent { position: relative; }
-  .cr-menu { position: absolute; z-index: 5; left: 0; bottom: calc(100% + 8px); width: min(340px, 82vw); padding: 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--ink); box-shadow: var(--lift); font-size: 14px; }
+  .cr-menu {
+    position: absolute;
+    z-index: 5;
+    left: 0;
+    bottom: calc(100% + 8px);
+    width: min(340px, 82vw);
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--panel);
+    border: 1px solid var(--ink);
+    box-shadow: var(--lift);
+    font-size: 14px;
+  }
   .cr-menu p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
   .cr-menu label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0; }
-  .cr-menu select { min-width: 0; max-width: 62%; font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .cr-menu select {
+    min-width: 0;
+    max-width: 62%;
+    font: inherit;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+  }
   .cr-menu .btn { width: 100%; justify-content: center; }
-  .cr-reset { margin-top: 14px; background: none; border: 0; padding: 0; font: inherit; font-size: 13px; color: var(--blue); text-decoration: underline; cursor: pointer; }
-  @media (max-width: 760px) { .cr-panel { padding: 22px 16px 20px; } .cr-panel::before { left: 16px; } }
+
+  @media (max-width: 760px) {
+    .cr-panel { padding: 22px 16px 20px; }
+    .cr-panel::before { left: 16px; }
+    .cr-replay-pill { right: 14px; top: 16px; padding: 4px 10px; font-size: 11px; }
+    .cr .f-chevron { display: none; }
+    /* the tabs scroll sideways when the counts do not fit; their line is drawn inside, so nothing is clipped */
+    .cr-tabs { gap: 16px; overflow-x: auto; scrollbar-width: none; border-bottom: 0; box-shadow: inset 0 -1px var(--line); }
+    .cr-tabs > * { margin-bottom: 0; }
+    .cr-tabs > .cr-tab-off, .cr .cr-long { display: none; }
+    .cr .rv-count { margin-left: 4px; }
+  }
+
+  /* reduced motion: the device's preference, or the toggle under the navbar (Base.astro) */
+  :root[data-motion="reduce"] .cr-panel::before, :root[data-motion="reduce"] .cr .finding, :root[data-motion="reduce"] .cr .rv-state, :root[data-motion="reduce"] .cr-replay-pill { transition: none !important; }
+  :root[data-motion="reduce"] .cr .finding.cr-pop, :root[data-motion="reduce"] .cr .rv-running, :root[data-motion="reduce"] .cr .rv-busy, :root[data-motion="reduce"] .cr .f-pill.fixing::after { animation: none !important; }
 </style>

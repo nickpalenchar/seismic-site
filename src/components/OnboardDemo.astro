@@ -1,0 +1,201 @@
+---
+// "Existing project? Seismic onboards it": the body of the "Set up Seismic for kinship" card once its demo is
+// ready, stripped to its two parts: the demo video on the left, the agent's handover on the right (scrolled to its
+// end, as in the app).
+// The video is the demo Seismic recorded on the card, from its export (demo.mp4, poster.jpg, captions.vtt).
+// Without `video`, the poster shows with a play button.
+interface Props {
+  video?: string;
+  poster?: string;
+  captions?: string;
+}
+const { video, poster, captions } = Astro.props;
+---
+<div class="ob" role="region" aria-label="Example card: Set up Seismic for kinship">
+  <div class="ob-cols">
+    <div class="ob-left">
+      {video ? (
+        <video class="ob-video" src={video} poster={poster} controls preload="metadata" playsinline>
+          {captions && <track kind="captions" src={captions} srclang="en" label="English" />}
+        </video>
+      ) : (
+        <div class="ob-video ob-poster">
+          <img src={poster} alt="Kinship, the app the demo shows" loading="lazy" />
+          <span class="ob-play" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="26" height="26"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+          </span>
+          <span class="ob-soon">Demo video coming soon</span>
+        </div>
+      )}
+    </div>
+
+    <div class="ob-right">
+      <div class="ob-right-inner">
+        <div class="ob-cap">Conversation</div>
+        <div class="ob-chat" data-ob-chat>
+          <div class="msg agent handover">
+            <b>Agent · Handover <span class="ob-meta">Claude Code · claude-opus-5-5 · 11:31 AM</span></b>
+            <p>Kinship now has its Seismic settings in <code>.obeya/settings.json</code>:</p>
+            <ul>
+              <li><strong>Setup:</strong> <code>bun install</code>.</li>
+              <li><strong>Checks:</strong> <code>bun run typecheck</code> and <code>bun test</code>. Both pass here.</li>
+              <li><strong>Running the app:</strong> a written recipe tells workers how to start Kinship. Each worker starts its own copy with <code>PORT=&lt;free port&gt; bun dev</code> as a background command. There's nothing to restart after code changes because it reloads by itself. Workers reseed with <code>bun run seed</code> before a demo or after a change to the database layout or demo data. No login is needed because every request acts as Jordan Lee.</li>
+              <li><strong>Stopping the app:</strong> <code>app.stop</code> stops only the Kinship server running in that workstation, never other workers' copies. I tested it here.</li>
+            </ul>
+            <p>I ran the app exactly as the recipe says (reseed, then <code>PORT=5281 bun dev</code>), and the demo was recorded from it. It's still running at <code>localhost:5281</code>.</p>
+            <p><strong>Decisions I made for you:</strong></p>
+            <ul>
+              <li>Workers share one checkout through worktrees rather than separate clones. That's safe because each worktree gets its own database file and its own port.</li>
+              <li>Approved work goes straight onto local <code>main</code>, because the repository has no remote.</li>
+              <li>No plan docs exist yet. <code>docs/backlog.md</code> is a list of ideas, not a plan, so new plans will go into <code>docs/plan/</code> when the first one is made.</li>
+              <li>There was no old <code>.obeya/adapter/</code> to move over or delete.</li>
+            </ul>
+            <p><strong>Allow list for Claude Code and Codex:</strong> this is in <code>.claude/settings.json</code>, and I also generated <code>.codex/rules/obeya.rules</code> from it for Codex outside Seismic. It allows these commands without asking:</p>
+            <ul>
+              <li><code>bun install</code> and <code>bun install --frozen-lockfile</code> (README)</li>
+              <li><code>bun dev</code> and <code>bun run dev</code> (README and <code>package.json</code>; these also cover the <code>PORT=…</code> form)</li>
+              <li><code>bun start</code> and <code>bun run start</code> (<code>package.json</code>)</li>
+              <li><code>bun run seed</code> (README)</li>
+              <li><code>bun run typecheck</code> and <code>bunx tsc --noEmit</code> (the checks)</li>
+              <li><code>bun test</code>, <code>bun run test</code> and both with arguments (the checks)</li>
+              <li><code>lsof -nP …</code>, a read-only command the recipe uses to find a free port</li>
+            </ul>
+            <p>One thing to weigh before you trust it: Codex rules match the start of a command, so for Codex outside Seismic, <code>bun install</code> would also allow <code>bun install &lt;some package&gt;</code>.</p>
+            <p>The settings take effect once they're on main. The allow list only counts after you trust it in the configuration. The card asked me to run <code>todo</code> first, but no command by that name exists on this machine.</p>
+          </div>
+          <div class="ob-history">History: 14 steps</div>
+          <div class="ob-bg">
+            <span class="ob-bg-cap">In the background</span>
+            <span class="ob-bg-row">
+              <svg class="ob-spin" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+              Reseed and start app per recipe <span class="ob-muted">for 7 min</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // the conversation opens scrolled to its end, as the card does in the app
+  document.querySelectorAll<HTMLElement>('[data-ob-chat]').forEach((chat) => {
+    chat.scrollTop = chat.scrollHeight;
+  });
+</script>
+
+<style>
+  /* Wider than the page's column: the window less 80px a side, up to 1440px, never narrower than the column
+     (100%), and never so wide that the video (whose height follows its width) runs past ~76% of the window's
+     height. 2.362 = 1.6 (the video's 16:10) × 3.1 / 2.1 (the card's width over the video column's);
+     84px = the side padding and the gap between the columns. */
+  .ob {
+    --ob-w: min(1440px, max(100%, calc(100vw - 160px)), calc((76svh - 50px) * 2.362 + 84px));
+    width: var(--ob-w);
+    margin-left: calc(50% - var(--ob-w) / 2);
+    position: relative;
+    border-radius: 18px;
+    background: var(--panel);
+    border: 1px solid var(--glass-edge);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--lift);
+    padding: 24px 28px 26px;
+    overflow: hidden;
+    text-align: left;
+  }
+  .ob-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .ob-video {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border-radius: 10px;
+    background: #0b0a09;
+    object-fit: cover;
+  }
+  .ob-poster { position: relative; overflow: hidden; display: grid; place-items: center; }
+  .ob-poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .ob-play {
+    position: relative;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: rgba(0, 0, 0, .55);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
+  }
+  .ob-soon {
+    position: absolute;
+    left: 12px;
+    bottom: 10px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: #fff;
+    background: rgba(0, 0, 0, .5);
+  }
+
+  /* the conversation takes the video's height and scrolls inside it */
+  .ob-right { position: relative; min-height: 320px; }
+  .ob-right-inner { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .ob-cap {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .ob-chat {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2px 4px 8px 0;
+    font-size: 14px;
+    line-height: 1.5;
+    scrollbar-width: thin;
+    mask-image: linear-gradient(to bottom, transparent, #000 28px);
+  }
+  .ob-chat .msg {
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: var(--card);
+    border: 1px solid var(--glass-edge);
+    max-width: 94%;
+  }
+  .ob-chat .msg b { display: block; font-size: 11.5px; margin-bottom: 2px; color: var(--blue); }
+  .ob-chat .msg.agent b { color: var(--amber); }
+  .ob-chat .msg ul { margin: 6px 0; padding-left: 18px; }
+  .ob-chat .msg p { margin: 8px 0; }
+  .ob-chat .msg.handover { max-width: 100%; }
+  .ob-meta { margin-left: 6px; font-weight: 500; color: var(--muted); }
+  .ob-chat .msg li { margin: 3px 0; }
+  .ob-chat code { font: 12.5px var(--mono); background: var(--chip); border-radius: 5px; padding: 1px 5px; }
+  .ob-history { font-size: 13px; color: var(--muted); }
+  .ob-bg { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+  .ob-bg-cap { color: var(--muted); }
+  .ob-bg-row { display: inline-flex; align-items: center; gap: 7px; }
+  .ob-spin { color: var(--blue); animation: ob-spin 1.6s linear infinite; }
+  .ob-muted { color: var(--muted); }
+  @keyframes ob-spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 820px) {
+    .ob { padding: 18px 18px 20px; }
+    .ob-cols { grid-template-columns: 1fr; gap: 20px; }
+    .ob-right { min-height: 0; }
+    .ob-right-inner { position: static; }
+    .ob-chat { max-height: 340px; }
+  }
+
+  /* reduced motion: the device's preference, or the toggle under the navbar (Base.astro) */
+  :global(:root[data-motion="reduce"]) .ob-spin { animation: none; }
+</style>

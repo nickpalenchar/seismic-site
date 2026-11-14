@@ -6,17 +6,20 @@
 // - Connection handles (Obeya connection dots) appear on card edges.
 // - Hovering or clicking a card highlights its full dependency chain (amber for "comes first", purple for "waits for it").
 const cards = [
-  { id: 'cloud', x: 40, y: 50, t: 'Cloud support', d: 'Run workspaces and agents in the cloud.' },
-  { id: 'multi', x: 40, y: 250, t: 'Multiuser support', d: 'Share a canvas with your team.' },
-  { id: 'mcp', x: 380, y: 50, t: 'MCP server', d: 'Allow agents to connect to and drive Seismic itself.' },
-  { id: 'linear', x: 380, y: 250, t: 'Connect to Linear and Jira', d: 'Turn tickets into cards, report back.' },
-  { id: 'pi', x: 724, y: 74, t: 'Pi harness', d: 'Run tasks with Pi.' },
-  { id: 'hermes', x: 724, y: 214, t: 'Hermes harness', d: 'Run tasks with Hermes.' },
-  { id: 'opencode', x: 724, y: 354, t: 'OpenCode harness', d: 'Run tasks with OpenCode.' },
-  { id: 'bench', x: 380, y: 450, t: 'Benchmarks', d: 'Agents on real deliverables, and yourself.' },
+  { id: 'cloud', x: 40, y: 60, t: 'Cloud support', d: 'Run workspaces and agents in the cloud.' },
+  { id: 'multi', x: 40, y: 230, t: 'Multiuser support', d: 'Share a canvas with your team.' },
+  { id: 'mcp', x: 380, y: 60, t: 'MCP server', d: 'Allow agents to connect to and drive Seismic itself.' },
+  { id: 'linear', x: 380, y: 230, t: 'Connect to Linear and Jira', d: 'Turn tickets into cards, report back.' },
+  { id: 'pi', x: 724, y: 84, t: 'Pi harness', d: 'Run tasks with Pi.' },
+  { id: 'hermes', x: 724, y: 224, t: 'Hermes harness', d: 'Run tasks with Hermes.' },
+  { id: 'opencode', x: 724, y: 364, t: 'OpenCode harness', d: 'Run tasks with OpenCode.' },
+  { id: 'bench', x: 380, y: 400, t: 'Benchmarks', d: 'Agents on real deliverables, and yourself.' },
+  { id: 'subagents', x: 40, y: 400, t: 'Subagents', d: 'Let an agent hand parts of a task to helpers.' },
+  { id: 'auto', x: 380, y: 570, t: 'Auto-select agents', d: 'Pick the right agent and model for each feature.' },
+  { id: 'github', x: 724, y: 570, t: 'GitHub issue syncing', d: 'Keep cards and GitHub issues in sync.' },
 ];
 // [prerequisite, the card that waits for it]
-const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['mcp', 'linear']];
+const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['mcp', 'linear'], ['bench', 'auto']];
 ---
 <div class="mm cs" id="cs" role="group" aria-label="Features coming soon, drawn as cards on a canvas. Drag cards to rearrange, hover to trace dependencies."
   data-waits={JSON.stringify(waits)} data-cards={JSON.stringify(cards)}>
@@ -27,23 +30,13 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
   </div>
 
   <div class="cs-world" id="cs-world">
-    <div class="cs-group" id="cs-group-harnesses" style="left:700px;top:34px;width:284px;height:478px"><span>Harnesses</span></div>
+    <div class="cs-group" id="cs-group-harnesses" style="left:700px;top:54px;width:284px;height:468px"><span>Harnesses</span></div>
     
-    <svg class="cs-deps" id="cs-deps" width="1000" height="620" aria-hidden="true">
+    <svg class="cs-deps" id="cs-deps" width="1000" height="730" aria-hidden="true">
       <defs>
-        <!-- Arrow heads matching Obeya's depHead and orientation -->
-        <marker id="m-faint" class="faint" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
-          <path d="M0 1.5L9 5L0 8.5z" />
-        </marker>
-        <marker id="m-lit" class="lit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="11" markerHeight="11" orient="auto" markerUnits="userSpaceOnUse">
-          <path d="M0 1.5L9 5L0 8.5z" />
-        </marker>
-        <marker id="m-first" class="lit-first" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="11" markerHeight="11" orient="auto" markerUnits="userSpaceOnUse">
-          <path d="M0 1.5L9 5L0 8.5z" />
-        </marker>
 
         <!-- Subtle glow filter for highlighted arrows -->
-        <filter id="cs-glow" x="-20%" y="-20%" width="140%" height="140%">
+        <filter id="cs-glow" filterUnits="userSpaceOnUse" x="-50" y="-50" width="1100" height="830">
           <feGaussianBlur stdDeviation="3" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -79,6 +72,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
 </div>
 
 <script>
+  import { linkWithHead } from '../lib/arrow';
   const root = document.getElementById('cs')!;
   const world = document.getElementById('cs-world')!;
   const svg = document.getElementById('cs-deps') as unknown as SVGSVGElement;
@@ -91,13 +85,13 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
   const initialMap = new Map(initialCardsData.map((c) => [c.id, { x: c.x, y: c.y }]));
 
   const cards = new Map([...root.querySelectorAll<HTMLElement>('.cs-card')].map((c) => [c.dataset.id!, c]));
-  const W = 1000, H = 620, HEAD = 10;
+  const W = 1000, H = 730, HEAD = 10;
   let currentScale = 1;
 
   // Fit world size and scale to container
   function fit() {
     const w = root.clientWidth;
-    currentScale = Math.max(0.55, Math.min(1.35, w / W));
+    currentScale = Math.max(0.55, Math.min(0.85, w / W));
     world.style.transform = `translateX(${Math.max(0, (w - W * currentScale) / 2)}px) scale(${currentScale})`;
     root.style.height = H * currentScale + 'px';
   }
@@ -112,7 +106,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
 
   // Obeya's link curve (from obeya src/ui/parts.tsx linkCurve):
   // Leaves facing edges square into the cards, square into the arrow head
-  function path(a: B, b: B): string {
+  function path(a: B, b: B) {
     const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
     const gapY = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
     const across = gapX > gapY;
@@ -123,7 +117,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
     const aside = across ? y2 - y1 : x2 - x1;
     const reach = dir * Math.max((dir * along) / 2, Math.min(Math.abs(aside) / 2, HEAD));
     const [c1x, c1y, c2x, c2y] = across ? [x1 + reach, y1, x2 - reach, y2] : [x1, y1 + reach, x2, y2 - reach];
-    return `M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}`;
+    return linkWithHead(x1, y1, c1x, c1y, c2x, c2y, x2, y2);
   }
 
   // Create SVG lines and flowing pulse paths
@@ -132,31 +126,36 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
     const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     pulse.setAttribute('class', 'cs-pulse');
 
-    const d = path(box(from), box(to));
+    const h = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const { d, head } = path(box(from), box(to));
     p.setAttribute('d', d);
     pulse.setAttribute('d', d);
+    h.setAttribute('d', head);
 
     baseLinesGroup.appendChild(p);
+    baseLinesGroup.appendChild(h);
     pulseLinesGroup.appendChild(pulse);
 
-    return { from, to, p, pulse };
+    return { from, to, p, pulse, h };
   });
 
   function updateLinesForCard(cardId: string) {
     for (const item of lineElements) {
       if (item.from === cardId || item.to === cardId) {
-        const d = path(box(item.from), box(item.to));
+        const { d, head } = path(box(item.from), box(item.to));
         item.p.setAttribute('d', d);
         item.pulse.setAttribute('d', d);
+        item.h.setAttribute('d', head);
       }
     }
   }
 
   function updateAllLines() {
     for (const item of lineElements) {
-      const d = path(box(item.from), box(item.to));
+      const { d, head } = path(box(item.from), box(item.to));
       item.p.setAttribute('d', d);
       item.pulse.setAttribute('d', d);
+      item.h.setAttribute('d', head);
     }
   }
 
@@ -204,17 +203,18 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
       }
     }
 
-    for (const { from, to, p, pulse } of lineElements) {
+    for (const { from, to, p, pulse, h } of lineElements) {
       const key = `${from} ${to}`;
       const kind = d && d.lit.has(key) ? (d.first.has(key) ? 'first' : 'lit') : 'faint';
       const clsName = kind === 'first' ? 'lit-first' : kind;
 
       p.setAttribute('class', clsName);
-      p.setAttribute('marker-end', `url(#m-${kind})`);
+      h.setAttribute('class', `head ${clsName}`);
       pulse.setAttribute('class', `cs-pulse ${clsName}`);
 
       if (kind !== 'faint') {
         baseLinesGroup.appendChild(p); // bring lit above faint
+        baseLinesGroup.appendChild(h);
         pulseLinesGroup.appendChild(pulse);
       }
     }
@@ -402,7 +402,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
     left: 0;
     top: 0;
     width: 1000px;
-    height: 620px;
+    height: 730px;
     transform-origin: 0 0;
   }
 
@@ -438,6 +438,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
 
   /* Flowing light pulse along the dependency curve */
   .cs-pulse {
+    display: none;
     fill: none !important;
     stroke-linecap: round;
     stroke-dasharray: 10 160;
@@ -471,21 +472,10 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
     to { stroke-dashoffset: 0; }
   }
 
-  /* Marker arrow heads */
-  .cs-deps marker.faint path {
-    fill: color-mix(in srgb, var(--muted) 70%, transparent);
-    stroke: none;
-  }
-
-  .cs-deps marker.lit path {
-    fill: var(--purple);
-    stroke: none;
-  }
-
-  .cs-deps marker.lit-first path {
-    fill: var(--amber);
-    stroke: none;
-  }
+  /* Arrow heads (filled triangles drawn by lib/arrow.ts) */
+  .cs-deps path.head { stroke: none; filter: none; fill: var(--muted); }
+  .cs-deps path.head.lit { fill: var(--purple); }
+  .cs-deps path.head.lit-first { fill: var(--amber); }
 
   /* Harness territory grouping */
   .cs-group {
@@ -605,8 +595,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
     .cs-controls { justify-content: flex-end; }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .cs-pulse { animation: none; display: none; }
-    .cs-card, .cs-card.dragging, .cs-card.snapping { transition: none; transform: none !important; }
-  }
+  /* reduced motion: the device's preference, or the toggle under the navbar (Base.astro) */
+  :root[data-motion="reduce"] .cs-pulse { animation: none; display: none; }
+  :root[data-motion="reduce"] .cs-card, :root[data-motion="reduce"] .cs-card.dragging, :root[data-motion="reduce"] .cs-card.snapping { transition: none; transform: none !important; }
 </style>

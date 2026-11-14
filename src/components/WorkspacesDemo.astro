@@ -1,138 +1,625 @@
 ---
-// "Isolated workspace flows are built in": a canvas with parallel agents at work,
-// connected by dependency arrows and merge conflict coordination lines, with the inbox slid out on the right.
+// "Isolated workspace flows are built in": Kinship's canvas with two workstreams in parallel (groups), dependency
+// arrows inside them and a merge-conflict line between them, with the inbox slid out on the right.
+// Achievements: "Club page should show my attendance, regulars" → "Achievements display as profile flair" →
+// "Clubs can create custom badges", each waiting for the one before. Events: "Calendar view for events" beside
+// "Waitlist for full events" → "Waitlist promotion alerts". The attendance card and the waitlist both change
+// src/features/events/server.ts, so their agents coordinate a merge conflict.
+// Interactive demo:
+// 1. The attendance card starts as "Agent working - recording demo" (recording demo in green, the rest in blue).
+// 2. After 3000ms in view, it turns orange, demo ready, and pops into the inbox, sliding the items below down.
+// 3. 2000ms later, "Calendar view for events" turns yellow with a question mark badge and "Question for you", and
+//    pops into the inbox.
+// 4. Clicking it (on the canvas or in the inbox) opens the card with the agent's "I would pick this one".
+// 5. Choosing and Send returns the card to "Agent at work".
+// Narrower canvases drop the third column, then the second; arrows and the conflict line only join cards that show.
 ---
-<div class="mm ws" id="ws" role="img" aria-label="A canvas with several tasks being worked on in parallel with dependency arrows, and the inbox open at the side">
+<div class="mm ws" id="ws" role="region" aria-label="Kinship's canvas: two workstreams of agents in parallel, with dependency arrows, a merge conflict they coordinate, and the inbox">
   <div class="mm-chrome">
     <div class="mm-bar">
       <img src="/img/logo.svg" alt="" width="26" height="26" />
-      <span class="mm-pill"><b>Tipjar</b> <i>main</i></span>
-      <span class="mm-right"><span class="mm-pill">2 need you</span></span>
+      <span class="mm-pill"><b>Kinship</b> <i>main</i></span>
+      <span class="mm-right">
+        <span class="mm-pill" id="ws-need-pill">0 need you</span>
+        <button class="ws-replay-btn" id="ws-replay-btn" type="button" title="Replay workspaces sequence">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+        </button>
+      </span>
     </div>
   </div>
 
-  <svg class="ws-deps" id="ws-deps" aria-hidden="true">
-    <defs>
-      <marker id="ws-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
-        <path d="M0 1.5L9 5L0 8.5z" fill="var(--muted)" />
-      </marker>
-      <marker id="ws-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
-        <path d="M0 1.5L9 5L0 8.5z" fill="var(--amber)" />
-      </marker>
-    </defs>
-    <!-- Arrow: Speed up search -> Show usage in the bar -->
-    <path id="ws-line-wait" class="ws-path" marker-end="url(#ws-arrow)" />
-    <path id="ws-pulse-wait" class="ws-pulse" />
+  <!-- the two workstreams, as groups on the canvas -->
+  <div class="ws-group row1"><span class="ws-group-name">Achievements</span></div>
+  <div class="ws-group row2"><span class="ws-group-name">Events</span></div>
 
-    <!-- Conflict sync line: Speed up search -> Export PDF -->
+  <svg class="ws-deps" id="ws-deps" aria-hidden="true">
+    <!-- Arrows: attendance -> profile flair -> custom badges; waitlist -> promotion alerts -->
+    <path id="ws-line-wait" class="ws-path" />
+    <path id="ws-head-wait" class="ws-head" />
+    <path id="ws-pulse-wait" class="ws-pulse" />
+    <path id="ws-line-badges" class="ws-path" />
+    <path id="ws-head-badges" class="ws-head" />
+    <path id="ws-line-alerts" class="ws-path" />
+    <path id="ws-head-alerts" class="ws-head" />
+    <path id="ws-pulse-alerts" class="ws-pulse" />
+
+    <!-- Conflict sync line: waitlist <-> attendance, both change src/features/events/server.ts -->
     <path id="ws-line-conflict" class="ws-path conflict" />
   </svg>
 
-  <div class="mm-card static ws-card" id="ws-c1" style="left:4%;top:80px;--c:var(--blue)">
-    <span class="kind">Task · seismic/search</span>
-    <b class="ttl">Speed up search</b>
-    <p class="meta">Index card titles on write.</p>
-    <span class="state">Agent at work<i class="stroke"></i></span>
+  <!-- Achievements -->
+  <!-- Attendance: starts as Agent working - recording demo, then demo ready -->
+  <div class="mm-card static ws-card col1 row1" id="ws-c3" style="--c:var(--blue)">
+    <span class="kind">Task · seismic/attendance</span>
+    <b class="ttl">Club page should show my attendance, regulars</b>
+    <p class="meta">Attendance bar and badge.</p>
+    <span class="state" id="ws-c3-state">
+      <span class="ws-txt-blue">Agent working</span> - <span class="ws-txt-green">recording demo</span><i class="stroke"></i>
+    </span>
   </div>
 
-  <div class="mm-card static ws-card" id="ws-c2" style="left:4%;top:236px;--c:var(--blue)">
-    <span class="kind">Task · seismic/onboarding</span>
-    <b class="ttl">Onboarding checklist</b>
-    <p class="meta">Three steps on first launch.</p>
-    <span class="state">Agent at work<i class="stroke"></i></span>
-  </div>
-
-  <div class="mm-card static ws-card" id="ws-c3" style="left:calc(4% + 316px);top:158px;--c:var(--amber)">
-    <span class="kind">Task · seismic/export</span>
-    <b class="ttl">Export the board as PDF</b>
-    <p class="meta">Resolving a merge conflict with search.</p>
-    <span class="state" style="color:var(--amber)">Needs you · demo ready</span>
-  </div>
-
-  <div class="mm-card static ws-card" id="ws-c4" style="left:calc(4% + 316px);top:314px;--c:var(--muted)">
+  <div class="mm-card static ws-card col2 row1" id="ws-c4" style="--c:var(--muted)">
     <span class="kind">Task</span>
-    <b class="ttl">Show usage in the bar</b>
-    <p class="meta">Waits for “Speed up search”.</p>
+    <b class="ttl">Achievements display as profile flair</b>
+    <p class="meta">Waits for the attendance card.</p>
     <span class="state" style="color:var(--muted)">In the queue</span>
   </div>
 
-  <aside class="inbox">
+  <div class="mm-card static ws-card col3 row1" id="ws-c5" style="--c:var(--muted)">
+    <span class="kind">Task</span>
+    <b class="ttl">Clubs can create custom badges</b>
+    <p class="meta">Waits for profile flair.</p>
+    <span class="state" style="color:var(--muted)">In the queue</span>
+  </div>
+
+  <!-- Events -->
+  <!-- Calendar view: turns yellow with ? badge, pops up in inbox, opens card on click -->
+  <div class="mm-card static ws-card col1 row2" id="ws-c2" style="--c:var(--blue)">
+    <span class="kind">Task · seismic/calendar-view</span>
+    <b class="ttl">Calendar view for events</b>
+    <p class="meta">A month grid of events.</p>
+    <span class="state" id="ws-c2-state">Agent at work<i class="stroke"></i></span>
+  </div>
+
+  <div class="mm-card static ws-card col2 row2" id="ws-c1" style="--c:var(--blue)">
+    <span class="kind">Task · seismic/waitlist</span>
+    <b class="ttl">Waitlist for full events</b>
+    <p class="meta">Merging with attendance.</p>
+    <span class="state">Agent at work<i class="stroke"></i></span>
+  </div>
+
+  <div class="mm-card static ws-card col3 row2" id="ws-c6" style="--c:var(--muted)">
+    <span class="kind">Task</span>
+    <b class="ttl">Waitlist promotion alerts</b>
+    <p class="meta">Waits for the waitlist.</p>
+    <span class="state" style="color:var(--muted)">In the queue</span>
+  </div>
+
+  <aside class="inbox" id="ws-inbox">
     <div class="cap">Inbox</div>
-    <div class="item"><b>Export the board as PDF</b><span>Demo ready. Approve or give feedback.</span></div>
-    <div class="item"><b>Onboarding checklist</b><span>Asks: dismiss per session, or for good?</span></div>
-    <div class="item quiet"><b>Speed up search</b><span>Conflict resolved on its own.</span></div>
+    <div class="ws-inbox-items" id="ws-inbox-items">
+      <div class="item quiet" id="ws-inbox-c1">
+        <b>Waitlist for full events</b>
+        <span>Conflict with attendance resolved on its own.</span>
+      </div>
+    </div>
   </aside>
+
+  <!-- Open Card View Modal (from Seismic / Obeya) -->
+  <div class="ws-modal-backdrop" id="ws-modal" hidden style="display: none;" role="dialog" aria-modal="true" aria-labelledby="ws-modal-title">
+    <div class="ws-modal-card" id="ws-modal-card">
+      <div class="ws-modal-head">
+        <div class="ws-modal-kind">Task · seismic/calendar-view</div>
+        <button type="button" class="ws-modal-close" id="ws-modal-close" aria-label="Close card">✕</button>
+        <h3 class="ws-modal-title" id="ws-modal-title">Calendar view for events</h3>
+        <div class="ws-modal-state">
+          <span class="ws-modal-qmark">?</span> Question for you
+        </div>
+      </div>
+
+      <div class="ws-modal-body">
+        <p class="ws-modal-desc">A calendar on the Events page, each club’s events in its colour, beside the list.</p>
+
+        <div class="ws-modal-ask">
+          <h4 class="ws-modal-ask-head">Question for you</h4>
+          <p class="ws-modal-ask-text">Should the calendar open on this week, or on the whole month?</p>
+
+          <div class="ws-modal-choices" role="radiogroup" aria-label="Calendar choices">
+            <button type="button" class="ws-modal-choice" data-choice="week" role="radio" aria-checked="false">
+              <span class="ws-modal-radio"></span>
+              <span class="ws-modal-choice-label">This week</span>
+            </button>
+
+            <button type="button" class="ws-modal-choice on" data-choice="month" role="radio" aria-checked="true">
+              <span class="ws-modal-radio"></span>
+              <span class="ws-modal-choice-label">
+                The whole month
+                <span class="ws-modal-pick-tag">I would pick this one</span>
+              </span>
+            </button>
+          </div>
+          <p class="ws-modal-pick-why">The agent would decide this way: most clubs meet weekly or less, so a single week looks empty.</p>
+        </div>
+
+        <div class="ws-modal-composer">
+          <input type="text" class="ws-modal-input" id="ws-modal-input" placeholder="A remark – optional" value="The whole month." />
+          <button type="button" class="btn primary ws-modal-send" id="ws-modal-send">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
+  import { linkWithHead } from '../lib/arrow';
+  import { reducedMotion, onMotionChange } from '../lib/motion';
   const wsArea = document.getElementById('ws');
-  const lineWait = document.getElementById('ws-line-wait') as SVGPathElement | null;
-  const pulseWait = document.getElementById('ws-pulse-wait') as SVGPathElement | null;
-  const lineConflict = document.getElementById('ws-line-conflict') as SVGPathElement | null;
 
   const c1 = document.getElementById('ws-c1');
+  const c2 = document.getElementById('ws-c2');
   const c3 = document.getElementById('ws-c3');
   const c4 = document.getElementById('ws-c4');
+  const c5 = document.getElementById('ws-c5');
+  const c6 = document.getElementById('ws-c6');
+  const $path = (id: string) => document.getElementById(id) as SVGPathElement | null;
+
+  type Box = { x: number; y: number; w: number; h: number };
+  const boxOf = (el: HTMLElement, root: DOMRect): Box | null => {
+    if (el.offsetParent === null) return null; // hidden on a narrow canvas
+    const r = el.getBoundingClientRect();
+    return { x: r.left - root.left, y: r.top - root.top, w: r.width, h: r.height };
+  };
+
+  /** A dependency arrow from one card's right side to the next one's left; cleared where either card is hidden. */
+  function arrow(from: HTMLElement | null, to: HTMLElement | null, line: string, head: string, pulse?: string) {
+    const ids = [line, head, ...(pulse ? [pulse] : [])];
+    const root = wsArea!.getBoundingClientRect();
+    const a = from && boxOf(from, root);
+    const b = to && boxOf(to, root);
+    if (!a || !b) {
+      ids.forEach((id) => $path(id)?.setAttribute('d', ''));
+      return;
+    }
+    const startX = a.x + a.w;
+    const startY = a.y + a.h / 2;
+    const endX = b.x - 3;
+    const endY = b.y + b.h / 2;
+    const dx = endX - startX;
+    const { d, head: tip } = linkWithHead(startX, startY, startX + dx * 0.5, startY, endX - dx * 0.5, endY, endX, endY);
+    $path(line)?.setAttribute('d', d);
+    $path(head)?.setAttribute('d', tip);
+    if (pulse) $path(pulse)?.setAttribute('d', d);
+  }
 
   function updateWorkspaceLines() {
-    if (!wsArea || !lineWait || !c1 || !c4) return;
-    const rRoot = wsArea.getBoundingClientRect();
-    const r1 = c1.getBoundingClientRect();
-    const r4 = c4.getBoundingClientRect();
+    if (!wsArea) return;
+    arrow(c3, c4, 'ws-line-wait', 'ws-head-wait', 'ws-pulse-wait');
+    arrow(c4, c5, 'ws-line-badges', 'ws-head-badges');
+    arrow(c1, c6, 'ws-line-alerts', 'ws-head-alerts', 'ws-pulse-alerts');
 
-    const box1 = {
-      x: r1.left - rRoot.left,
-      y: r1.top - rRoot.top,
-      w: r1.width,
-      h: r1.height,
-    };
-
-    const box4 = {
-      x: r4.left - rRoot.left,
-      y: r4.top - rRoot.top,
-      w: r4.width,
-      h: r4.height,
-    };
-
-    // Bézier curve from c1 right to c4 left
-    const startX = box1.x + box1.w;
-    const startY = box1.y + box1.h / 2;
-    const endX = box4.x - 10;
-    const endY = box4.y + box4.h / 2;
-    const dx = endX - startX;
-
-    const dWait = `M${startX},${startY} C${startX + dx * 0.5},${startY} ${endX - dx * 0.5},${endY} ${endX},${endY}`;
-    lineWait.setAttribute('d', dWait);
-    if (pulseWait) pulseWait.setAttribute('d', dWait);
-
-    if (c3 && lineConflict) {
-      const r3 = c3.getBoundingClientRect();
-      const box3 = {
-        x: r3.left - rRoot.left,
-        y: r3.top - rRoot.top,
-        w: r3.width,
-        h: r3.height,
-      };
-
-      const cStartX = box1.x + box1.w;
-      const cStartY = box1.y + box1.h / 2;
-      const cEndX = box3.x - 4;
-      const cEndY = box3.y + box3.h / 2;
-      const cdx = cEndX - cStartX;
-
-      const dConflict = `M${cStartX},${cStartY} C${cStartX + cdx * 0.5},${cStartY} ${cEndX - cdx * 0.5},${cEndY} ${cEndX},${cEndY}`;
-      lineConflict.setAttribute('d', dConflict);
+    // the conflict line: from the waitlist's top up to the attendance card's bottom
+    const conflict = $path('ws-line-conflict');
+    const root = wsArea.getBoundingClientRect();
+    const w = c1 && boxOf(c1, root);
+    const att = c3 && boxOf(c3, root);
+    if (!conflict) return;
+    if (!w || !att) {
+      conflict.setAttribute('d', '');
+      return;
     }
+    const sx = w.x + w.w * 0.3;
+    const sy = w.y;
+    const ex = att.x + att.w * 0.7;
+    const ey = att.y + att.h;
+    const dy = sy - ey;
+    conflict.setAttribute('d', `M${sx},${sy} C${sx},${sy - dy * 0.5} ${ex},${ey + dy * 0.5} ${ex},${ey}`);
   }
 
   window.addEventListener('resize', updateWorkspaceLines);
   setTimeout(updateWorkspaceLines, 50);
   setTimeout(updateWorkspaceLines, 300);
+
+  // Dynamic Workspace Flow Timers and Interactions
+  let wsTimers: number[] = [];
+  let wsHasStarted = false;
+  let onboardingAnswered = false;
+
+  const modal = document.getElementById('ws-modal')!;
+  const modalClose = document.getElementById('ws-modal-close')!;
+  const modalSend = document.getElementById('ws-modal-send')!;
+  const replayBtn = document.getElementById('ws-replay-btn');
+  const needPill = document.getElementById('ws-need-pill');
+
+  function clearWsTimers() {
+    wsTimers.forEach(clearTimeout);
+    wsTimers = [];
+  }
+
+  function openOnboardingModal() {
+    if (onboardingAnswered) return;
+    modal.hidden = false;
+    modal.style.display = 'flex';
+  }
+
+  function closeOnboardingModal() {
+    modal.hidden = true;
+    modal.style.display = 'none';
+  }
+
+  // Ensure modal is closed on init
+  closeOnboardingModal();
+
+  function startWorkspaceFlow() {
+    clearWsTimers();
+
+    const c3El = document.getElementById('ws-c3');
+    const c3State = document.getElementById('ws-c3-state');
+    const c2El = document.getElementById('ws-c2');
+    const c2State = document.getElementById('ws-c2-state');
+    const inboxItems = document.getElementById('ws-inbox-items');
+
+    // Initial state: the attendance card starts as "Agent working - recording demo"
+    if (c3El && c3State) {
+      c3El.style.setProperty('--c', 'var(--blue)');
+      c3State.innerHTML = '<span class="ws-txt-blue">Agent working</span> - <span class="ws-txt-green">recording demo</span><i class="stroke"></i>';
+      c3State.style.color = '';
+    }
+
+    // Initial state: "Calendar view for events" starts as "Agent at work" unless already answered
+    if (c2El && c2State && !onboardingAnswered) {
+      c2El.style.setProperty('--c', 'var(--blue)');
+      c2El.classList.remove('s-waiting', 'asking', 'clickable');
+      c2State.innerHTML = 'Agent at work<i class="stroke"></i>';
+      c2State.style.color = '';
+      const oldBadge = c2El.querySelector('.ws-badge');
+      if (oldBadge) oldBadge.remove();
+    }
+
+    // Inbox initially has only quiet item (neither c3 nor c2 in inbox yet)
+    if (inboxItems) {
+      inboxItems.innerHTML = `
+        <div class="item quiet" id="ws-inbox-c1">
+          <b>Waitlist for full events</b>
+          <span>Conflict with attendance resolved on its own.</span>
+        </div>
+      `;
+    }
+    if (needPill) needPill.textContent = '0 need you';
+
+    // Step 1: After 3000ms in view (500ms earlier), c3 turns orange demo ready and pops up in inbox
+    const t1 = window.setTimeout(() => {
+      if (c3El && c3State) {
+        c3El.style.setProperty('--c', 'var(--amber)');
+        c3El.classList.add('pop-demo');
+        c3El.addEventListener('animationend', () => c3El.classList.remove('pop-demo'), { once: true });
+        c3State.innerHTML = 'Needs you · demo ready';
+        c3State.style.color = 'var(--amber)';
+      }
+
+      if (inboxItems) {
+        const slotExport = document.createElement('div');
+        slotExport.className = 'ws-inbox-slot';
+        slotExport.id = 'ws-slot-export';
+        slotExport.innerHTML = `
+          <div class="ws-slot-inner">
+            <div class="item ws-inbox-pop" id="ws-inbox-export">
+              <b>Club page should show my attendance, regulars</b>
+              <span>Demo ready. Approve or give feedback.</span>
+            </div>
+          </div>
+        `;
+        inboxItems.prepend(slotExport);
+        requestAnimationFrame(() => {
+          slotExport.classList.add('open');
+        });
+      }
+      if (needPill) needPill.textContent = '1 needs you';
+
+      // Step 2: 2000ms later, c2 turns yellow with ? badge and pops into inbox
+      const t2 = window.setTimeout(() => {
+        if (onboardingAnswered) return;
+
+        if (c2El && c2State) {
+          c2El.style.setProperty('--c', 'var(--asking)');
+          c2El.classList.add('s-waiting', 'asking', 'clickable', 'pop-demo');
+          c2El.addEventListener('animationend', () => c2El.classList.remove('pop-demo'), { once: true });
+          c2State.innerHTML = '<span class="question-mark">?</span> Question for you';
+          c2State.style.color = 'var(--asking)';
+
+          let badge = c2El.querySelector('.ws-badge');
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'ws-badge asking pulse';
+            badge.setAttribute('aria-label', 'Question for you');
+            badge.textContent = '?';
+            c2El.appendChild(badge);
+          }
+        }
+
+        if (inboxItems && !document.getElementById('ws-inbox-onboard')) {
+          const slotOnboard = document.createElement('div');
+          slotOnboard.className = 'ws-inbox-slot';
+          slotOnboard.id = 'ws-slot-onboard';
+          slotOnboard.innerHTML = `
+            <div class="ws-slot-inner">
+              <div class="item ws-inbox-pop asking" id="ws-inbox-onboard" role="button" tabindex="0" title="Click to open question">
+                <b>Calendar view for events</b>
+                <span>Asks: open on this week, or the month?</span>
+              </div>
+            </div>
+          `;
+
+          const slotExport = document.getElementById('ws-slot-export');
+          if (slotExport && slotExport.nextSibling) {
+            inboxItems.insertBefore(slotOnboard, slotExport.nextSibling);
+          } else {
+            inboxItems.prepend(slotOnboard);
+          }
+
+          const itemOnboard = slotOnboard.querySelector('#ws-inbox-onboard');
+          if (itemOnboard) {
+            itemOnboard.addEventListener('click', openOnboardingModal);
+          }
+
+          requestAnimationFrame(() => {
+            slotOnboard.classList.add('open');
+          });
+        }
+        if (needPill) needPill.textContent = '2 need you';
+      }, reducedMotion() ? 0 : 2000);
+
+      wsTimers.push(t2);
+    }, reducedMotion() ? 0 : 3000);
+
+    wsTimers.push(t1);
+  }
+
+  // Trigger when workspace demo enters view
+  const wsObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && !wsHasStarted) {
+          wsHasStarted = true;
+          startWorkspaceFlow();
+          wsObserver.disconnect();
+        }
+      });
+    },
+    { threshold: 0.2 }
+  );
+  if (wsArea) wsObserver.observe(wsArea);
+
+  // turned on midway: skip ahead to the later state
+  onMotionChange((reduced) => {
+    if (reduced && wsHasStarted && !onboardingAnswered) startWorkspaceFlow();
+  });
+
+  // Clicking the calendar card while it asks opens the modal
+  if (c2) {
+    c2.addEventListener('click', () => {
+      if (c2.classList.contains('asking') && !onboardingAnswered) {
+        openOnboardingModal();
+      }
+    });
+  }
+
+  modalClose.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeOnboardingModal();
+  });
+  const modalCardEl = document.getElementById('ws-modal-card');
+  if (modalCardEl) {
+    modalCardEl.addEventListener('click', (e) => e.stopPropagation());
+  }
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeOnboardingModal();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden) closeOnboardingModal();
+  });
+
+  // Modal radio choices toggle
+  const choiceBtns = modal.querySelectorAll<HTMLElement>('.ws-modal-choice');
+  const modalInput = document.getElementById('ws-modal-input') as HTMLInputElement | null;
+  choiceBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      choiceBtns.forEach((b) => {
+        b.classList.remove('on');
+        b.setAttribute('aria-checked', 'false');
+      });
+      btn.classList.add('on');
+      btn.setAttribute('aria-checked', 'true');
+      if (modalInput) {
+        modalInput.value = btn.dataset.choice === 'month' ? 'The whole month.' : 'This week.';
+      }
+    });
+  });
+
+  // Send answer: returns card to "Agent at work" and won't change again
+  modalSend.addEventListener('click', () => {
+    onboardingAnswered = true;
+    closeOnboardingModal();
+
+    const c2El = document.getElementById('ws-c2');
+    const c2State = document.getElementById('ws-c2-state');
+    if (c2El && c2State) {
+      c2El.style.setProperty('--c', 'var(--blue)');
+      c2El.classList.remove('s-waiting', 'asking', 'clickable');
+      c2State.innerHTML = 'Agent at work<i class="stroke"></i>';
+      c2State.style.color = '';
+      const badge = c2El.querySelector('.ws-badge');
+      if (badge) badge.remove();
+    }
+
+    // Animate removal from inbox: smooth slide up of items below
+    const slotOnboard = document.getElementById('ws-slot-onboard');
+    if (slotOnboard) {
+      slotOnboard.classList.remove('open');
+      setTimeout(() => slotOnboard.remove(), 450);
+    }
+
+    if (needPill) needPill.textContent = '1 needs you';
+  });
+
+  if (replayBtn) {
+    replayBtn.addEventListener('click', () => {
+      onboardingAnswered = false;
+      closeOnboardingModal();
+      startWorkspaceFlow();
+    });
+  }
 </script>
 
 <style is:global>
-  .ws { height: 460px; cursor: default; position: relative; }
-  .ws .mm-card { cursor: default; }
+  .ws {
+    --asking: #b28600;
+    container-type: inline-size;
+    height: 460px;
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .ws {
+      --asking: #e0b62e;
+    }
+  }
+  :root[data-theme="dark"] .ws {
+    --asking: #e0b62e;
+  }
+
+  /* the canvas: two workstreams (rows) of up to three cards (columns) */
+  .ws .ws-card { --cw: 220px; --ch: 124px; --x0: 22px; --step: 246px; left: var(--x0); }
+  .ws .ws-card.col2 { left: calc(var(--x0) + var(--step)); }
+  .ws .ws-card.col3 { left: calc(var(--x0) + 2 * var(--step)); }
+  .ws .ws-card.row1 { top: 92px; }
+  .ws .ws-card.row2 { top: 276px; }
+  .ws .ws-card .ttl { font-size: 15px; }
+  .ws .ws-card .meta { margin-top: 3px; font-size: 12.5px; -webkit-line-clamp: 1; }
+  .ws-group {
+    --gw: 742px;
+    position: absolute;
+    z-index: 0;
+    left: 10px;
+    width: var(--gw);
+    height: 168px;
+    border-radius: 18px;
+    border: 1px solid var(--glass-edge);
+    background: color-mix(in srgb, var(--card) 38%, transparent);
+  }
+  .ws-group.row1 { top: 64px; }
+  .ws-group.row2 { top: 248px; }
+  .ws-group-name {
+    position: absolute;
+    left: 14px;
+    top: 7px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  /* a narrower canvas drops the third column, then the second */
+  @container (max-width: 1060px) {
+    .ws .ws-card.col3 { display: none; }
+    .ws .ws-card { --cw: 200px; --step: 218px; }
+    .ws-group { --gw: 452px; }
+  }
+  @container (max-width: 760px) {
+    .ws .ws-card.col2 { display: none; }
+    .ws-group { --gw: 234px; }
+  }
+
+  .ws .mm-card {
+    cursor: default;
+    transition: transform .18s, box-shadow .18s, border-color .18s;
+  }
+
+  .ws .mm-card.clickable {
+    cursor: pointer !important;
+  }
+
+  .ws .mm-card.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 2px var(--asking), var(--lift) !important;
+  }
+
+  .ws .ws-txt-blue {
+    color: var(--blue);
+    font-weight: 600;
+  }
+
+  .ws .ws-txt-green {
+    color: var(--green);
+    font-weight: 600;
+  }
+
+  /* Badge in top-right of card for Question (?) */
+  .ws-badge {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    color: #fff;
+    font: 700 12px/22px var(--sans);
+    text-align: center;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.45), transparent 45%), var(--asking);
+    box-shadow: 0 0 0 2px var(--panel), 0 2px 6px rgba(0,0,0,.25);
+    z-index: 5;
+    animation: wsBadgePop 0.35s cubic-bezier(.2,1.4,.4,1);
+  }
+
+  .ws-badge.pulse::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: var(--asking);
+    opacity: 0;
+    pointer-events: none;
+    animation: wsBadgePulse 2s ease-out infinite;
+  }
+
+  @keyframes wsBadgePulse {
+    0% { transform: scale(.7); opacity: .7; }
+    70%, 100% { transform: scale(1.4); opacity: 0; }
+  }
+
+  @keyframes wsBadgePop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .question-mark {
+    display: inline-block;
+    margin-right: 4px;
+    font-weight: 700;
+  }
+
+  /* Quiet replay button in chrome */
+  .ws-replay-btn {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    border-radius: 4px;
+    transition: color .15s, background .15s;
+    margin-left: 4px;
+  }
+  .ws-replay-btn:hover {
+    color: var(--ink);
+    background: var(--chip);
+  }
 
   .ws-deps {
     position: absolute;
@@ -151,6 +638,8 @@
     transition: stroke .2s;
   }
 
+  .ws-head { fill: var(--muted); stroke: none; }
+
   .ws-path.conflict {
     stroke: var(--amber);
     stroke-width: 1.8;
@@ -164,6 +653,7 @@
   }
 
   .ws-pulse {
+    display: none;
     fill: none;
     stroke: var(--blue);
     stroke-width: 2.8;
@@ -195,16 +685,389 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    overflow-y: auto;
   }
 
-  .ws .inbox .cap { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  .ws .inbox .item { padding: 10px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--glass-edge); font-size: 13px; line-height: 1.35; }
-  .ws .inbox .item b { display: block; font-size: 14px; }
-  .ws .inbox .item span { color: var(--muted); }
-  .ws .inbox .item:not(.quiet) { box-shadow: 0 0 0 2px var(--amber); }
-  .ws .inbox .quiet { opacity: .7; }
+  .ws .inbox .cap {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
 
-  @media (max-width: 900px) { .ws .mm-card:nth-of-type(n+3) { display: none; } }
-  @media (max-width: 640px) { .ws { height: 400px; } .ws .mm-card { --cw: 150px; } .ws .inbox { width: 52%; } .ws .mm-card .meta { display: none; } }
-  @media (prefers-reduced-motion: reduce) { .ws-pulse, .ws-path.conflict { animation: none; } }
+  .ws-inbox-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .ws .inbox .item {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--card);
+    border: 1px solid var(--glass-edge);
+    font-size: 13px;
+    line-height: 1.35;
+    box-shadow: var(--shadow);
+    transition: transform .15s, box-shadow .15s;
+    text-align: left;
+    margin-bottom: 8px;
+  }
+
+  .ws .inbox .item:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Slot container for smooth height expand that slides items below down */
+  .ws-inbox-slot {
+    display: grid;
+    grid-template-rows: 0fr;
+    margin-bottom: 0px;
+    transition: grid-template-rows 0.44s cubic-bezier(0.2, 0.9, 0.28, 1), margin-bottom 0.44s cubic-bezier(0.2, 0.9, 0.28, 1);
+  }
+
+  .ws-inbox-slot.open {
+    grid-template-rows: 1fr;
+    margin-bottom: 8px;
+  }
+
+  .ws-slot-inner {
+    min-height: 0;
+    overflow: hidden;
+    padding: 2px 2px;
+    margin: -2px -2px;
+  }
+
+  .ws-slot-inner .item {
+    margin-bottom: 0;
+  }
+
+  /* Pop / Zoom in-out animation for newly appearing item in inbox */
+  .ws-inbox-slot.open .ws-inbox-pop {
+    animation: wsInboxZoomPop 0.48s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  @keyframes wsInboxZoomPop {
+    0% {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+    60% {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+    82% {
+      transform: scale(0.97);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .ws .mm-card.pop-demo {
+    animation: wsCardDemoPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes wsCardDemoPop {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+
+  .ws .inbox .item b {
+    display: block;
+    font-size: 14px;
+  }
+
+  .ws .inbox .item span {
+    color: var(--muted);
+  }
+
+  .ws .inbox .item:not(.quiet):not(.asking) {
+    box-shadow: 0 0 0 2px var(--amber);
+  }
+
+  .ws .inbox .item.asking {
+    box-shadow: 0 0 0 2px var(--asking);
+    cursor: pointer;
+  }
+  .ws .inbox .item.asking:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 2px var(--asking), var(--lift);
+  }
+
+  .ws .inbox .quiet {
+    opacity: .7;
+  }
+
+  /* Open Card Modal (Seismic / Obeya style) */
+  .ws-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    background: rgba(10, 18, 30, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: wsFadeIn 0.2s ease-out;
+  }
+
+  .ws-modal-backdrop[hidden] {
+    display: none !important;
+  }
+
+  @keyframes wsFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .ws-modal-card {
+    position: relative;
+    width: min(480px, 94%);
+    max-height: 94%;
+    background: var(--panel);
+    border: 1px solid var(--glass-edge);
+    box-shadow: var(--lift);
+    border-radius: 14px;
+    overflow: hidden;
+    text-align: left;
+    animation: wsCardScaleIn 0.28s cubic-bezier(.2,1.3,.3,1);
+  }
+
+  .ws-modal-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3.5px;
+    background: var(--asking);
+  }
+
+  @keyframes wsCardScaleIn {
+    from { transform: scale(0.92) translateY(12px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+  }
+
+  .ws-modal-close {
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 0;
+    background: var(--chip);
+    color: var(--muted);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    transition: color .15s, background .15s;
+  }
+  .ws-modal-close:hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--chip) 75%, var(--ink));
+  }
+
+  .ws-modal-head {
+    padding: 20px 24px 10px;
+  }
+
+  .ws-modal-kind {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .ws-modal-title {
+    font-size: 23px;
+    font-weight: 700;
+    margin: 4px 0 6px;
+    color: var(--ink);
+    letter-spacing: -.01em;
+  }
+
+  .ws-modal-state {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--asking);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ws-modal-qmark {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--asking);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .ws-modal-body {
+    padding: 0 24px 22px;
+  }
+
+  .ws-modal-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 14px;
+    line-height: 1.45;
+  }
+
+  .ws-modal-ask {
+    padding: 13px 15px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--asking) 8%, var(--card));
+    border: 1px solid color-mix(in srgb, var(--asking) 28%, var(--line));
+    margin-bottom: 14px;
+  }
+
+  .ws-modal-ask-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--asking);
+    font-weight: 700;
+    margin: 0 0 6px;
+  }
+
+  .ws-modal-ask-text {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 0 0 10px;
+    line-height: 1.4;
+  }
+
+  .ws-modal-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ws-modal-choice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 11px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: all .14s;
+  }
+
+  .ws-modal-radio {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px solid var(--muted);
+    background: var(--card);
+  }
+
+  .ws-modal-choice.on {
+    border-color: var(--asking);
+    background: color-mix(in srgb, var(--asking) 12%, var(--card));
+  }
+
+  .ws-modal-choice.on .ws-modal-radio {
+    border-color: var(--asking);
+    background: radial-gradient(var(--asking) 0 3.5px, var(--card) 4px);
+  }
+
+  .ws-modal-choice-label {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .ws-modal-pick-tag {
+    display: inline-block;
+    margin-left: auto;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--pink);
+    background: color-mix(in srgb, var(--pink) 12%, transparent);
+  }
+
+  .ws-modal-pick-why {
+    margin: 8px 0 0 2px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .ws-modal-composer {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .ws-modal-input {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .ws-modal-input:focus {
+    border-color: var(--muted);
+  }
+
+  .ws-modal-send {
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+
+  @media (max-width: 640px) {
+    .ws { height: 400px; }
+    .ws .mm-card { --cw: 136px; --ch: 112px; --x0: 12px; padding: 12px 11px 10px; }
+    .ws .mm-card .kind { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ws .ws-card .ttl { font-size: 13.5px; -webkit-line-clamp: 3; }
+    .ws .mm-card .state { left: 11px; right: 11px; font-size: 11px; }
+    .ws-group { --gw: 156px; left: 4px; }
+    .ws .inbox { width: 52%; }
+    .ws .mm-card .meta { display: none; }
+  }
+
+  /* reduced motion: the device's preference, or the toggle under the navbar (Base.astro) */
+  :root[data-motion="reduce"] .ws-pulse, :root[data-motion="reduce"] .ws-path.conflict, :root[data-motion="reduce"] .ws-badge.pulse::after, :root[data-motion="reduce"] .ws-inbox-pop, :root[data-motion="reduce"] .ws .mm-card.pop-demo, :root[data-motion="reduce"] .ws-modal-card {
+      animation: none !important;
+      transition: none !important;
+    }
+  :root[data-motion="reduce"] .ws-inbox-slot {
+      grid-template-rows: 1fr !important;
+      margin-bottom: 8px !important;
+      transition: none !important;
+    }
 </style>

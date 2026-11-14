@@ -1,7 +1,7 @@
 
 # Title
 
-Employ your agents like a VP of Engineering
+The Mind Map-driven Harness for your Agentic Factory
 
 ## Subtitle
 

@@ -1,8 +1,15 @@
 version: '1'
 service_name: seismic-site
 
+# Prod is the only environment, so a bare `pdb deploy` targets it.
+defaults:
+  env: prod
+
 components:
   - site:static:
       build_script: bun run build
       entrypoint: dist
-      ^cloudflare:domain: seismic.site
+      # DNS (and ACM validation) for seismic.im is handled by the Cloudflare extension.
+      ^cloudflare:domain: seismic.im
+      # Deploying from the CLI, so use the local AWS profile (ignored in CI).
+      aws_profile: prod-pilot-admin

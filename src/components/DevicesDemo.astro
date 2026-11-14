@@ -1,0 +1,316 @@
+---
+// "Take Seismic wherever you go": Seismic on three screens at once: a laptop on the left (a notch with its webcam
+// in the top bezel, the hinge and the deck below), a phone in the middle (the island at its top, buttons on both
+// sides) and a small tablet on the right (portrait, its volume buttons sticking out of the right side).
+// The frames are inline SVGs drawn over the screens, with the screen cut out of them; each screen holds a GIF or
+// a video (`.mp4` / `.webm` play muted on a loop), or a placeholder until there is one. With reduced motion (the
+// toggle under the navbar, or the device's preference) a screen shows its `still` instead, a frame of the clip.
+interface Screen {
+  src?: string;
+  alt?: string;
+  poster?: string;
+  /** A still frame of the clip, shown instead of it with reduced motion. */
+  still?: string;
+}
+type Device = "laptop" | "phone" | "tablet";
+interface Props {
+  laptop?: Screen;
+  phone?: Screen;
+  tablet?: Screen;
+  /** The devices to show, in this order; without the laptop, the phone and the tablet grow to lead. */
+  show?: Device[];
+}
+const { laptop = {}, phone = {}, tablet = {}, show = ["laptop", "phone", "tablet"] } = Astro.props;
+const mobileOnly = !show.includes("laptop");
+
+/** A rounded rectangle as path data, so a frame can cut its screen out with the even-odd rule. */
+const rr = (x: number, y: number, w: number, h: number, r: number) =>
+  `M${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h - r}A${r},${r} 0 0 1 ${x + w - r},${y + h}H${x + r}A${r},${r} 0 0 1 ${x},${y + h - r}V${y + r}A${r},${r} 0 0 1 ${x + r},${y}Z`;
+
+/** Where a screen sits in its frame, as percentages of the frame, and its corners. */
+const place = (vb: { w: number; h: number }, s: { x: number; y: number; w: number; h: number; r: number; square?: boolean }) => {
+  const rx = (s.r / s.w) * 100;
+  const ry = (s.r / s.h) * 100;
+  const radius = s.square ? `${rx}% ${rx}% 0 0 / ${ry}% ${ry}% 0 0` : `${rx}% / ${ry}%`;
+  return `left:${(s.x / vb.w) * 100}%;top:${(s.y / vb.h) * 100}%;width:${(s.w / vb.w) * 100}%;height:${(s.h / vb.h) * 100}%;border-radius:${radius}`;
+};
+
+// the laptop: 16:10 screen, like the demos Seismic records (1440×900)
+const LV = { w: 1000, h: 612 };
+const LS = { x: 88, y: 20, w: 824, h: 515, r: 10, square: true };
+// the phone: 19.5:9
+const PV = { w: 220, h: 412 };
+const PS = { x: 20, y: 10, w: 180, h: 390, r: 30 };
+// the tablet: an 8.3-inch screen's proportions, portrait
+const TV = { w: 372, h: 530 };
+const TS = { x: 28, y: 24, w: 318, h: 484, r: 14 };
+
+const isVideo = (src?: string) => !!src && /\.(mp4|webm)$/i.test(src);
+const screens = [
+  { key: "laptop", screen: laptop, label: "Seismic on a laptop" },
+  { key: "phone", screen: phone, label: "Seismic on a phone" },
+  { key: "tablet", screen: tablet, label: "Seismic on a tablet" },
+] as const;
+const media = Object.fromEntries(screens.map((s) => [s.key, s]));
+---
+<div class={`dv-wrap${Astro.slots.has("default") ? " has-text" : ""}`}>
+<div class="dv-text"><slot /></div>
+<div class={`dv${mobileOnly ? " mobile-only" : ""}`} role="group" aria-label={`Seismic on ${show.map((d) => `a ${d}`).join(", ").replace(/, ([^,]*)$/, " and $1")}`}>
+  {show.map((key) => {
+    const { screen, label } = media[key]!;
+    const vb = key === "laptop" ? LV : key === "phone" ? PV : TV;
+    const sc = key === "laptop" ? LS : key === "phone" ? PS : TS;
+    return (
+      <figure class={`dv-device dv-${key}`} style={`aspect-ratio:${vb.w} / ${vb.h}`}>
+        <div class={`dv-screen${screen.still ? " has-still" : ""}`} style={place(vb, sc)}>
+          {screen.src ? (
+            isVideo(screen.src) ? (
+              <video class="dv-anim" src={screen.src} poster={screen.poster} autoplay muted loop playsinline preload="metadata" aria-label={screen.alt ?? label} />
+            ) : (
+              <img class="dv-anim" src={screen.src} alt={screen.alt ?? label} loading="lazy" decoding="async" />
+            )
+          ) : (
+            <div class="dv-placeholder" role="img" aria-label={`${label} (demo coming soon)`}>
+              <img src="/img/logo.svg" alt="" width="40" height="40" />
+            </div>
+          )}
+          {screen.src && screen.still && <img class="dv-still" src={screen.still} alt={screen.alt ?? label} loading="lazy" decoding="async" />}
+        </div>
+
+        {key === "laptop" && (
+          <svg class="dv-frame" viewBox={`0 0 ${LV.w} ${LV.h}`} aria-hidden="true">
+            <defs>
+              <linearGradient id="dv-l-metal" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--dv-metal-hi)" />
+                <stop offset="1" stop-color="var(--dv-metal-lo)" />
+              </linearGradient>
+              <linearGradient id="dv-l-deck" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--dv-metal-hi)" />
+                <stop offset=".55" stop-color="var(--dv-metal-mid)" />
+                <stop offset="1" stop-color="var(--dv-metal-lo)" />
+              </linearGradient>
+            </defs>
+            <!-- the lid: its metal edge, then the black bezel, the screen cut out of both -->
+            <path fill="url(#dv-l-metal)" fill-rule="evenodd" d={`${rr(70, 0, 860, 576, 26)}${rr(LS.x, LS.y, LS.w, LS.h, LS.r)}`} />
+            <path fill="var(--dv-bezel)" fill-rule="evenodd" d={`${rr(73, 3, 854, 570, 23)}${rr(LS.x, LS.y, LS.w, LS.h, LS.r)}`} />
+            <!-- the notch over the screen's top edge, with the webcam -->
+            <path fill="var(--dv-bezel)" d={`M${500 - 58},${LS.y - 1}H${500 + 58}V${LS.y + 11}A8,8 0 0 1 ${500 + 50},${LS.y + 19}H${500 - 50}A8,8 0 0 1 ${500 - 58},${LS.y + 11}Z`} />
+            <circle cx="500" cy={LS.y + 8} r="4" fill="#22252c" />
+            <circle cx="500" cy={LS.y + 8} r="1.7" fill="#3d4d6b" />
+            <!-- the hinge and the deck, with the groove to open it by -->
+            <rect x="74" y="576" width="852" height="5" fill="var(--dv-hinge)" />
+            <path fill="url(#dv-l-deck)" d="M0,581H1000V593Q1000,606 982,607H18Q0,606 0,593Z" />
+            <path fill="var(--dv-metal-lo)" opacity=".75" d="M428,581H572V584Q572,590 564,590H436Q428,590 428,584Z" />
+          </svg>
+        )}
+
+        {key === "phone" && (
+          <svg class="dv-frame" viewBox={`0 0 ${PV.w} ${PV.h}`} aria-hidden="true">
+            <!-- the buttons, sticking out of the sides: action and volume on the left, power on the right -->
+            <rect class="dv-btn" x="7" y="72" width="4.5" height="18" rx="1.5" />
+            <rect class="dv-btn" x="7" y="104" width="4.5" height="34" rx="1.5" />
+            <rect class="dv-btn" x="7" y="146" width="4.5" height="34" rx="1.5" />
+            <rect class="dv-btn" x="208.5" y="118" width="4.5" height="54" rx="1.5" />
+            <path class="dv-edge" fill-rule="evenodd" d={`${rr(10, 0, 200, 410, 38)}${rr(PS.x, PS.y, PS.w, PS.h, PS.r)}`} />
+            <path fill="var(--dv-bezel)" fill-rule="evenodd" d={`${rr(12.5, 2.5, 195, 405, 35.5)}${rr(PS.x, PS.y, PS.w, PS.h, PS.r)}`} />
+            <!-- the island at the top of the screen -->
+            <rect x={110 - 31} y={PS.y + 10} width="62" height="18" rx="9" fill="#050506" />
+            <circle cx={110 + 20} cy={PS.y + 19} r="3.2" fill="#1b1f2a" />
+          </svg>
+        )}
+
+        {key === "tablet" && (
+          <svg class="dv-frame" viewBox={`0 0 ${TV.w} ${TV.h}`} aria-hidden="true">
+            <!-- the top button on the top edge, the volume buttons sticking out of the right side -->
+            <rect class="dv-btn" x="282" y="2.5" width="46" height="5" rx="1.8" />
+            <rect class="dv-btn" x="361" y="70" width="5" height="42" rx="1.8" />
+            <rect class="dv-btn" x="361" y="120" width="5" height="42" rx="1.8" />
+            <path class="dv-edge" fill-rule="evenodd" d={`${rr(10, 6, 354, 520, 30)}${rr(TS.x, TS.y, TS.w, TS.h, TS.r)}`} />
+            <path fill="var(--dv-bezel)" fill-rule="evenodd" d={`${rr(12.5, 8.5, 349, 515, 27.5)}${rr(TS.x, TS.y, TS.w, TS.h, TS.r)}`} />
+            <!-- the front camera, in the top bezel -->
+            <circle cx={TV.w / 2 - 1} cy="16.5" r="3" fill="#22252c" />
+            <circle cx={TV.w / 2 - 1} cy="16.5" r="1.2" fill="#3d4d6b" />
+          </svg>
+        )}
+      </figure>
+    );
+  })}
+</div>
+</div>
+
+<style>
+  /* Wider than the page's column, like the onboarding card: the window less 80px a side, up to 1320px. */
+  /* Wider than the page's column, like the onboarding card: the window less 80px a side, up to 1320px. With text
+     (the slot), it stands beside the devices on a wide window, on their right, and above them otherwise. */
+  .dv-wrap {
+    --dv-w: min(1320px, max(100%, calc(100vw - 160px)));
+    width: var(--dv-w);
+    margin-left: calc(50% - var(--dv-w) / 2);
+  }
+  .dv-text:empty { display: none; }
+  @media (min-width: 1000px) {
+    .dv-wrap.has-text {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+      align-items: start;
+      gap: 56px;
+    }
+    .dv-wrap.has-text .dv-text { order: 2; text-align: left; }
+    .dv-wrap.has-text .dv-text :global(h2), .dv-wrap.has-text .dv-text :global(.lede) { text-align: left; margin-left: 0; }
+    .dv-wrap.has-text .dv-text :global(.lede) { margin-bottom: 0; }
+    .dv-wrap.has-text .dv { width: 100%; margin: 0; }
+  }
+  .dv-text :global(.dv-steps) {
+    margin: 26px 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: dv-step;
+    display: grid;
+    gap: 16px;
+    text-align: left;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .dv-text :global(.dv-steps li) {
+    position: relative;
+    padding-left: 40px;
+    counter-increment: dv-step;
+  }
+  .dv-text :global(.dv-steps li::before) {
+    content: counter(dv-step);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+    background: color-mix(in srgb, var(--blue) 12%, transparent);
+  }
+  .dv-text :global(.dv-steps b) { display: block; color: var(--ink); font-weight: 650; }
+  .dv-text :global(code) { font: .9em var(--mono); background: var(--chip); border-radius: 5px; padding: 1px 5px; white-space: nowrap; }
+  .dv-text :global(.dv-note) {
+    margin: 22px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    text-align: left;
+  }
+  /* above the devices: the column's width, centred */
+  @media (max-width: 999.98px) {
+    .dv-text { max-width: 620px; margin: 0 auto 36px; }
+  }
+
+  .dv {
+    --dv-w: min(1320px, max(100%, calc(100vw - 160px)));
+    --dv-metal-hi: #eceef1;
+    --dv-metal-mid: #d3d6db;
+    --dv-metal-lo: #a9adb5;
+    --dv-hinge: #8b9098;
+    --dv-bezel: #0c0d0f;
+    --dv-shadow: rgba(20, 30, 50, .22);
+    width: var(--dv-w);
+    margin: 8px 0 0 calc(50% - var(--dv-w) / 2);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3.2%;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .dv {
+      --dv-metal-hi: #63666d;
+      --dv-metal-mid: #44474d;
+      --dv-metal-lo: #2b2d31;
+      --dv-hinge: #1e1f22;
+      --dv-shadow: rgba(0, 0, 0, .55);
+    }
+  }
+  :root[data-theme="dark"] .dv {
+    --dv-metal-hi: #63666d;
+    --dv-metal-mid: #44474d;
+    --dv-metal-lo: #2b2d31;
+    --dv-hinge: #1e1f22;
+    --dv-shadow: rgba(0, 0, 0, .55);
+  }
+
+  .dv-device {
+    position: relative;
+    margin: 0;
+    flex: none;
+    filter: drop-shadow(0 18px 22px var(--dv-shadow)) drop-shadow(0 2px 3px var(--dv-shadow));
+  }
+  /* sizes in the row: the laptop largest, the phone shorter than the tablet, as they are */
+  .dv-laptop { width: 58%; }
+  .dv-phone { width: 12.5%; }
+  .dv-tablet { width: 21.5%; }
+
+  .dv-screen {
+    position: absolute;
+    z-index: 1;
+    overflow: hidden;
+    background: #0b0a09;
+  }
+  .dv-screen > img, .dv-screen > video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+  }
+  /* the tablet's clip is 3:4, wider than the screen: keep its left edge (logo, canvas controls), trim the right */
+  .dv-tablet .dv-screen > img, .dv-tablet .dv-screen > video { object-position: left top; }
+  /* reduced motion: the still frame in place of the clip (a lazy image hidden this way is not even fetched) */
+  .dv-screen > .dv-still { display: none; }
+  :global(:root[data-motion="reduce"]) .dv-screen.has-still > .dv-anim { display: none; }
+  :global(:root[data-motion="reduce"]) .dv-screen.has-still > .dv-still { display: block; }
+  .dv-placeholder {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--dot, color-mix(in srgb, var(--muted) 35%, transparent)) 1px, transparent 1.3px);
+    background-size: 16px 16px;
+  }
+  .dv-placeholder img { width: 18%; max-width: 64px; height: auto; opacity: .55; }
+
+  .dv-frame {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .dv-edge { fill: var(--dv-metal-mid); stroke: var(--dv-metal-lo); stroke-width: .8; }
+  .dv-btn { fill: var(--dv-metal-mid); stroke: var(--dv-metal-lo); stroke-width: .8; }
+
+  /* on a narrow window the laptop takes the whole row, the phone and the tablet share the next */
+  @media (max-width: 760px) {
+    .dv { flex-wrap: wrap; row-gap: 28px; gap: 28px 8%; }
+    .dv-laptop { width: 100%; }
+    .dv-phone { width: 30%; }
+    .dv-tablet { width: 50%; }
+  }
+
+  /* only the phone and the tablet: larger, side by side, sized so the tablet fits ~70% of the window's height
+     (--tw is the tablet's width; the phone is 0.63 of it, which makes it ~0.83 of the tablet's height, about as
+     they are) */
+  .dv.mobile-only {
+    --tw: min(400px, 52%, calc(70svh * 372 / 530));
+    gap: max(40px, 5%);
+  }
+  .dv.mobile-only .dv-tablet { width: var(--tw); }
+  .dv.mobile-only .dv-phone { width: calc(var(--tw) * .63); }
+  @media (max-width: 760px) {
+    .dv.mobile-only { --tw: 57%; flex-wrap: nowrap; gap: 5%; }
+  }
+</style>

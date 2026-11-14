@@ -11,6 +11,7 @@
 </div>
 
 <script>
+  import { reducedMotion } from '../lib/motion';
   interface LitPoint {
     col: number;
     row: number;
@@ -59,7 +60,6 @@
       let mouseY = -9999;
       let mouseActive = false;
 
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       function isDark(): boolean {
         const theme = document.documentElement.dataset.theme;
@@ -174,7 +174,7 @@
 
         ctx.clearRect(0, 0, width, height);
 
-        if (!reduceMotion) {
+        if (!reducedMotion()) {
           // Continuous gentle panning from top-left to bottom-right
           panX += DIR_X * PAN_SPEED * dt;
           panY += DIR_Y * PAN_SPEED * dt;
@@ -193,6 +193,7 @@
 
         // 1. Initial Wavefront Sweep: starts right on page load at top-left
         const maxDiagonal = (width + height) * Math.SQRT1_2;
+        if (!sweepDone && reducedMotion()) sweepDone = true;
         if (!sweepDone) {
           sweepDist += sweepSpeed * dt;
           if (sweepDist > maxDiagonal + sweepBand) {
