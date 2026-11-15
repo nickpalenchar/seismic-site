@@ -229,6 +229,44 @@
 
   const allCards = [c1, c2, c3a, c3b, c3c, cSugg, c4a, c4b, c4c, c4d, c5a, c5b, c5c];
 
+  // On a narrow screen the flow runs top to bottom in three lanes, so it fits the width without zooming far out.
+  // The waitlist's suggested follow-up sits in a sixth row, reached by a dotted arrow around the right of its lane.
+  const narrow = matchMedia('(max-width: 700px)');
+  const isVertical = () => narrow.matches;
+  const LANE = [0, 244, 488];
+  const ROW = [0, 160, 320, 480, 640, 800];
+  const verticalLayout = new Map<HTMLElement, [number, number]>([
+    [c1, [LANE[1], ROW[0]]],
+    [c2, [LANE[1], ROW[1]]],
+    [c3a, [LANE[0], ROW[2]]], [c3b, [LANE[1], ROW[2]]], [c3c, [LANE[2], ROW[2]]],
+    [c4a, [LANE[0], ROW[3]]], [c4b, [LANE[1], ROW[3]]], [c4c, [LANE[2], ROW[3]]],
+    [c5a, [LANE[0], ROW[4]]], [c5b, [LANE[1], ROW[4]]], [c5c, [LANE[2], ROW[4]]],
+    [c4d, [LANE[1], ROW[5]]], [cSugg, [LANE[2], ROW[5]]],
+  ]);
+  // how far the dotted arrow to the suggestion swings out past the right lane
+  const SWING = 44;
+  const horizontalLayout = new Map(allCards.map((c) => [c, [c.style.left, c.style.top] as const]));
+  let layoutMode: 'vertical' | 'horizontal' | null = null;
+
+  function applyLayout() {
+    const mode = isVertical() ? 'vertical' : 'horizontal';
+    if (mode === layoutMode) return false;
+    layoutMode = mode;
+    for (const card of allCards) {
+      if (mode === 'vertical') {
+        const [x, y] = verticalLayout.get(card)!;
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+      } else {
+        const [left, top] = horizontalLayout.get(card)!;
+        card.style.left = left;
+        card.style.top = top;
+      }
+    }
+    sizeStage();
+    return true;
+  }
+
   let hasTriggered = false;
   let runningAnimation = false;
   let timeouts: number[] = [];
@@ -287,18 +325,50 @@
     return baseScale;
   }
 
+  function moveWorld(cx: number, cy: number, scale: number, durationMs: number) {
+    if (reducedMotion()) durationMs = 0;
+    const targetX = viewport.clientWidth / 2 - cx * scale;
+    const targetY = viewport.clientHeight / 2 - cy * scale;
+    world.style.transition = durationMs > 0 ? `transform ${durationMs}ms cubic-bezier(0.2, 0.9, 0.3, 1)` : 'none';
+    world.style.transform = `translate(${targetX}px, ${targetY}px) scale(${scale})`;
+  }
+
   // Fast camera control with responsive scaling
   function setCamera(cx: number, cy: number, scale: number, durationMs = 380) {
-    if (reducedMotion()) durationMs = 0;
-    const effectiveScale = getScaleFactor(scale);
-    const vW = viewport.clientWidth;
-    const vH = viewport.clientHeight;
+    moveWorld(cx, cy, getScaleFactor(scale), durationMs);
+  }
 
-    const targetX = vW / 2 - cx * effectiveScale;
-    const targetY = vH / 2 - cy * effectiveScale;
+  // The vertical layout's camera: frames the given cards, as large as fits the stage, up to maxScale
+  const FIT_PAD = 12;
+  function bounds(cards: HTMLElement[]): Bounds {
+    const bs = cards.map(box);
+    const x = Math.min(...bs.map((b) => b.x));
+    const y = Math.min(...bs.map((b) => b.y));
+    // the dotted arrow to the suggestion swings out to the right of the right lane
+    const right = Math.max(...bs.map((b) => b.x + b.w + (b.x === LANE[2] ? SWING : 0)));
+    const bottom = Math.max(...bs.map((b) => b.y + b.h));
+    return { x, y, w: right - x, h: bottom - y };
+  }
+  function fitCamera(cards: HTMLElement[], maxScale: number, durationMs = 380) {
+    const b = bounds(cards);
+    const scale = Math.min(maxScale, (viewport.clientWidth - FIT_PAD * 2) / b.w, (viewport.clientHeight - FIT_PAD * 2) / b.h);
+    moveWorld(b.x + b.w / 2, b.y + b.h / 2, scale, durationMs);
+  }
 
-    world.style.transition = durationMs > 0 ? `transform ${durationMs}ms cubic-bezier(0.2, 0.9, 0.3, 1)` : 'none';
-    world.style.transform = `translate(${targetX}px, ${targetY}px) scale(${effectiveScale})`;
+  // The vertical stage is as tall as the whole flow at the width that fits it; the horizontal one keeps its CSS height
+  function sizeStage() {
+    if (!isVertical()) {
+      container.style.height = '';
+      return;
+    }
+    const b = bounds(allCards);
+    const scale = (viewport.clientWidth - FIT_PAD * 2) / b.w;
+    container.style.height = `${Math.ceil(b.h * scale + FIT_PAD * 2)}px`;
+  }
+
+  function finalCamera(durationMs = 420) {
+    if (isVertical()) fitCamera(allCards, 1, durationMs);
+    else setCamera(780, 340, 0.60, durationMs);
   }
 
   /**
@@ -341,8 +411,8 @@
         mask.setAttribute('maskContentUnits', 'userSpaceOnUse');
         mask.setAttribute('x', '0');
         mask.setAttribute('y', '0');
-        mask.setAttribute('width', '1560');
-        mask.setAttribute('height', '700');
+        mask.setAttribute('width', '1600');
+        mask.setAttribute('height', '1000');
 
         const maskPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         maskPath.setAttribute('d', dPath);
@@ -572,7 +642,8 @@
     // -------------------------------------------------------------
     // PHASE 1 (0ms): Zoomed in: Task 1 pops up large
     // -------------------------------------------------------------
-    setCamera(150, 265, 1.35, 0);
+    if (isVertical()) fitCamera([c1], 1.3, 0);
+    else setCamera(150, 265, 1.35, 0);
 
     await wait(60);
     popCard(c1);
@@ -582,7 +653,8 @@
     // -------------------------------------------------------------
     // PHASE 2 (320ms): Rapid zoom out, arrow grows to Card 2, status chips auto-assigned
     // -------------------------------------------------------------
-    setCamera(310, 265, 1.05, 360);
+    if (isVertical()) fitCamera([c1, c2], 1.05, 360);
+    else setCamera(310, 265, 1.05, 360);
 
     await wait(70);
     const path12 = linkCurve(box(c1), box(c2));
@@ -598,7 +670,9 @@
     // PHASE 3 (1020ms): Zoom out, 3 arrows branch with visible STAGGER
     // Center arrow starts first, then top, then bottom
     // -------------------------------------------------------------
-    setCamera(580, 270, 0.82, 380);
+    // vertical: from here on the width sets the scale, so the whole flow is framed and grows down inside it
+    if (isVertical()) finalCamera(380);
+    else setCamera(580, 270, 0.82, 380);
 
     await wait(70);
     const b2 = box(c2);
@@ -606,23 +680,22 @@
     const b3b = box(c3b);
     const b3c = box(c3c);
 
-    const startX = b2.x + b2.w;
-    const startY = b2.y + b2.h / 2;
-
-    const targetA_X = b3a.x - 8;
-    const targetA_Y = b3a.y + b3a.h / 2;
-
-    const targetB_X = b3b.x - 8;
-    const targetB_Y = b3b.y + b3b.h / 2;
-
-    const targetC_X = b3c.x - 8;
-    const targetC_Y = b3c.y + b3c.h / 2;
-
-    const junctionX = startX + (targetB_X - startX) * 0.44;
-
-    const pathTop = `M${startX},${startY} C${junctionX},${startY} ${junctionX - 10},${targetA_Y} ${targetA_X},${targetA_Y}`;
-    const pathMid = `M${startX},${startY} L${targetB_X},${targetB_Y}`;
-    const pathBtm = `M${startX},${startY} C${junctionX},${startY} ${junctionX - 10},${targetC_Y} ${targetC_X},${targetC_Y}`;
+    // the plan fans out into its three workstreams: rightward, or downward in the vertical layout
+    const branch = (to: Bounds) => {
+      if (isVertical()) {
+        const [sx, sy] = [b2.x + b2.w / 2, b2.y + b2.h];
+        const [tx, ty] = [to.x + to.w / 2, to.y - 8];
+        const jy = sy + (ty - sy) * 0.44;
+        return tx === sx ? `M${sx},${sy} L${tx},${ty}` : `M${sx},${sy} C${sx},${jy} ${tx},${jy - 10} ${tx},${ty}`;
+      }
+      const [sx, sy] = [b2.x + b2.w, b2.y + b2.h / 2];
+      const [tx, ty] = [to.x - 8, to.y + to.h / 2];
+      const jx = sx + (b3b.x - 8 - sx) * 0.44;
+      return ty === sy ? `M${sx},${sy} L${tx},${ty}` : `M${sx},${sy} C${jx},${sy} ${jx - 10},${ty} ${tx},${ty}`;
+    };
+    const pathTop = branch(b3a);
+    const pathMid = branch(b3b);
+    const pathBtm = branch(b3c);
 
     // STAGGERED BRANCH 1: Center worker (3B) starts immediately
     const arrowMid = createGrowingArrow(pathMid, 'f-arrow-blue', 'flow-arrow', 'var(--blue)', c2, c3b, 250).then(() => {
@@ -648,17 +721,25 @@
     // PHASE 4 (1840ms): Zoom out to Column 4 (Reviews, Demos & Intermediate Tasks)
     // Downstream branches stagger naturally
     // -------------------------------------------------------------
-    setCamera(820, 290, 0.70, 380);
+    if (!isVertical()) setCamera(820, 290, 0.70, 380);
 
     await wait(70);
 
     // Dotted curve rounding downward from Bottom Card (c3c) to cSugg
     const bSugg = box(cSugg);
-    const ptStartX = b3c.x + 60;
-    const ptStartY = b3c.y + b3c.h;
-    const ptEndX = bSugg.x + 60;
-    const ptEndY = bSugg.y - 8;
-    const pathDottedSugg = `M${ptStartX},${ptStartY} C${ptStartX},${ptStartY + 35} ${ptEndX},${ptEndY - 35} ${ptEndX},${ptEndY}`;
+    let pathDottedSugg: string;
+    if (isVertical()) {
+      // out of the waitlist card's right side, down past its lane, into the suggestion's right side
+      const [sx, sy] = [b3c.x + b3c.w, b3c.y + b3c.h / 2];
+      const [ex, ey] = [bSugg.x + bSugg.w + 8, bSugg.y + bSugg.h / 2];
+      pathDottedSugg = `M${sx},${sy} C${sx + SWING},${sy} ${ex + SWING - 8},${ey} ${ex},${ey}`;
+    } else {
+      const ptStartX = b3c.x + 60;
+      const ptStartY = b3c.y + b3c.h;
+      const ptEndX = bSugg.x + 60;
+      const ptEndY = bSugg.y - 8;
+      pathDottedSugg = `M${ptStartX},${ptStartY} C${ptStartX},${ptStartY + 35} ${ptEndX},${ptEndY - 35} ${ptEndX},${ptEndY}`;
+    }
     
     const arrowSugg = createGrowingArrow(pathDottedSugg, 'f-arrow-purple', 'flow-arrow dotted purple', 'var(--purple)', c3c, cSugg, 240).then(() => {
       popCard(cSugg);
@@ -692,7 +773,7 @@
     // PHASE 5 (2550ms): GRAND EXPANSION in multiple directions!
     // Camera glides out to frame the sprawling network
     // -------------------------------------------------------------
-    setCamera(780, 340, 0.60, 420);
+    finalCamera(420);
 
     await wait(70);
 
@@ -712,8 +793,10 @@
     // 3. Convergent release: Review (4A) and Demo (4B) both curve into Canary Deploy (5B)
     await wait(120);
     const b5b = box(c5b);
-    const boxDeployTop = { ...b5b, y: b5b.y - 14 };
-    const boxDeployBtm = { ...b5b, y: b5b.y + 14 };
+    // two arrows into one card arrive side by side: above and below its middle, or left and right of it
+    const shift = (b: Bounds, d: number): Bounds => (isVertical() ? { ...b, x: b.x + d } : { ...b, y: b.y + d });
+    const boxDeployTop = shift(b5b, -14);
+    const boxDeployBtm = shift(b5b, 14);
     const path4aTo5b = linkCurve(box(c4a), boxDeployTop);
     const path4bTo5b = linkCurve(box(c4b), boxDeployBtm);
 
@@ -725,8 +808,8 @@
     // 4. Convergent telemetry: Replica Catchup (4C) and Rollback Simulation (4D) curve into Health Probe (5C)
     await wait(120);
     const b5c = box(c5c);
-    const boxProbeTop = { ...b5c, y: b5c.y - 14 };
-    const boxProbeBtm = { ...b5c, y: b5c.y + 14 };
+    const boxProbeTop = shift(b5c, -14);
+    const boxProbeBtm = shift(b5c, 14);
     const path4cTo5c = linkCurve(box(c4c), boxProbeTop);
     const path4dTo5c = linkCurve(box(c4d), boxProbeBtm);
 
@@ -758,11 +841,18 @@
 
   replayBtn.addEventListener('click', () => runFastOrchestration());
 
-  // Window resize fits camera
+  // Window resize fits camera; crossing between the layouts plays the flow again in the new one
+  applyLayout();
   window.addEventListener('resize', () => {
-    if (!runningAnimation && hasTriggered) {
-      setCamera(780, 340, 0.60, 0);
+    if (applyLayout()) {
+      if (hasTriggered) {
+        runningAnimation = false;
+        runFastOrchestration();
+      }
+      return;
     }
+    sizeStage();
+    if (!runningAnimation && hasTriggered) finalCamera(0);
   });
 </script>
 
@@ -773,7 +863,9 @@
     width: 100%;
     height: 560px;
     margin: 44px auto 64px;
-    overflow: visible;
+    /* the zoomed-in world never widens the page; vertically the cards' shadows may spill */
+    overflow-x: clip;
+    overflow-y: visible;
     user-select: none;
     -webkit-user-select: none;
     background: transparent;
@@ -1096,6 +1188,13 @@
 
   @media (max-width: 900px) {
     .flow-free-stage { height: 490px; margin: 36px auto 48px; }
+  }
+
+  /* the vertical layout (the script sets the stage's height to fit it); the replay pill moves below the flow,
+     clear of the hero buttons */
+  @media (max-width: 700px) {
+    .flow-free-stage { height: 410px; margin: 56px auto 56px; }
+    .flow-stage-controls { top: auto; bottom: -40px; left: 0; right: 0; text-align: center; }
   }
 
   /* reduced motion: the device's preference, or the toggle under the navbar (Base.astro) */

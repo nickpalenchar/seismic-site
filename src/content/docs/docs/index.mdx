@@ -13,14 +13,15 @@ background, and you judge the result from a recorded demo instead of reading cod
 
 ## How it works
 
-- **A canvas per project.** Every project is a canvas with infinite space, and each card on it is a
-  task. Group cards, arrange them and draw dependencies between them, or let agents do it.
-- **One worker per card.** Each card gets its own agent, working in its own clone or worktree of
-  the repository. Workers run in parallel, resolve conflicts and land their work in order.
+- **Projects hold memory.** A Project is made up of at least one **Canvas**, on which **cards** are created to represent
+  tasks. Crads can have arrows drawn between them (so one comes before the other), and/or grouped for visual orginization. Agents can also be
+  configured to intuit arrow directions (dependencies) of cards ars the're created.
+- **Cards get workers** Each card gets its own agent, which act as a "worker", and carries out the task as a change in its own workspace
+(a [git worktree]() or cloned repo, depending on config) Workers run in parallel, and coordinate landing work once finished and approved.
 - **A demo for every handover.** When a worker is done it records a narrated video (or a page to
-  look at) and hands the card over. You approve it, or give feedback and the worker carries on.
-- **Adversarial code reviews.** A separate reviewer agent reads every change against the
-  repository's own rules. You decide per finding: fix it, make it a follow-up, or leave it.
+  look at) and hands the card over.
+- **An Independent reviewer follows** - if turned on, a seperate agent will review the work and flag any issues. You choose to have the worker
+address them now, as a follow up, or not at all.
 
 :::note
 These docs are new and still growing. If something you need is missing, the

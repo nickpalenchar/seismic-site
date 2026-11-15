@@ -1,8 +1,7 @@
 ---
 import PlayableVideo from "./PlayableVideo.astro";
-// "Existing project? Seismic onboards it": the body of the "Set up Seismic for kinship" card once its demo is
-// ready, stripped to its two parts: the demo video on the left, the agent's handover on the right (scrolled to its
-// end, as in the app).
+// "Existing project? Seismic onboards it": the "Onboard Kinship onto Seismic" card once its demo is ready: its title
+// above the demo video on the left and the agent's handover on the right (scrolled to its end, as in the app).
 // The video is the demo Seismic recorded on the card, from its export (demo.mp4, poster.jpg, captions.vtt).
 // Without `video`, the poster shows with a play button.
 interface Props {
@@ -12,7 +11,13 @@ interface Props {
 }
 const { video, poster, captions } = Astro.props;
 ---
-<div class="ob" role="region" aria-label="Example card: Set up Seismic for kinship">
+<div class="ob" role="region" aria-label="Example card: Onboard Kinship onto Seismic">
+  <div class="ob-head">
+    <div class="ob-kind">Task</div>
+    <div class="ob-title">Onboard <code>Kinship</code> onto Seismic</div>
+    <div class="ob-state">● Demo ready</div>
+  </div>
+
   <div class="ob-cols">
     <div class="ob-left">
       {video ? (
@@ -34,7 +39,7 @@ const { video, poster, captions } = Astro.props;
         <div class="ob-chat" data-ob-chat>
           <div class="msg agent handover">
             <b>Agent · Handover <span class="ob-meta">Claude Code · claude-opus-5-5 · 11:31 AM</span></b>
-            <p>Kinship now has its Seismic settings in <code>.obeya/settings.json</code>:</p>
+            <p>Kinship now has its Seismic settings in <code>.seismic/settings.json</code>:</p>
             <ul>
               <li><strong>Setup:</strong> <code>bun install</code>.</li>
               <li><strong>Checks:</strong> <code>bun run typecheck</code> and <code>bun test</code>. Both pass here.</li>
@@ -47,9 +52,9 @@ const { video, poster, captions } = Astro.props;
               <li>Workers share one checkout through worktrees rather than separate clones. That's safe because each worktree gets its own database file and its own port.</li>
               <li>Approved work goes straight onto local <code>main</code>, because the repository has no remote.</li>
               <li>No plan docs exist yet. <code>docs/backlog.md</code> is a list of ideas, not a plan, so new plans will go into <code>docs/plan/</code> when the first one is made.</li>
-              <li>There was no old <code>.obeya/adapter/</code> to move over or delete.</li>
+              <li>There was no old <code>adapter/</code> folder to move over or delete.</li>
             </ul>
-            <p><strong>Allow list for Claude Code and Codex:</strong> this is in <code>.claude/settings.json</code>, and I also generated <code>.codex/rules/obeya.rules</code> from it for Codex outside Seismic. It allows these commands without asking:</p>
+            <p><strong>Allow list for Claude Code and Codex:</strong> this is in <code>.claude/settings.json</code>, and I also generated <code>.codex/rules/seismic.rules</code> from it for Codex outside Seismic. It allows these commands without asking:</p>
             <ul>
               <li><code>bun install</code> and <code>bun install --frozen-lockfile</code> (README)</li>
               <li><code>bun dev</code> and <code>bun run dev</code> (README and <code>package.json</code>; these also cover the <code>PORT=…</code> form)</li>
@@ -101,6 +106,14 @@ const { video, poster, captions } = Astro.props;
     overflow: hidden;
     text-align: left;
   }
+  /* the card's head, as the demo card above draws it (ReviewDemo.astro) */
+  .ob-head { margin-bottom: 18px; }
+  .ob-kind { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .ob-title { font-size: 28px; font-weight: 650; letter-spacing: -.018em; line-height: 1.12; margin: 2px 0 6px; }
+  .ob-title code { font-family: var(--mono); font-size: .86em; font-weight: 600; padding: 0 .2em; border-radius: 6px; background: var(--chip); }
+  .ob-state { font-size: 13px; font-weight: 600; color: var(--amber); }
+  @media (max-width: 760px) { .ob-title { font-size: 24px; } }
+
   .ob-cols {
     display: grid;
     grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);

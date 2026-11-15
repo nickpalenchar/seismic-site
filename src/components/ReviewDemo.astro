@@ -212,9 +212,10 @@ import PlayableVideo from "./PlayableVideo.astro";
   );
   observer.observe(card);
 
-  // reduced motion: finished from the start, nothing plays when it scrolls into view; turned on midway, it
-  // finishes at once
-  if (reducedMotion()) {
+  // reduced motion, or a phone-sized screen (where the unfold would push the page around as you scroll): finished
+  // from the start, nothing plays when it scrolls into view; reduced motion turned on midway finishes it at once
+  const narrow = matchMedia('(max-width: 760px)');
+  if (reducedMotion() || narrow.matches) {
     hasTriggered = true;
     showFinished();
   }
@@ -224,7 +225,7 @@ import PlayableVideo from "./PlayableVideo.astro";
     showFinished();
   });
 
-  replayBtn.addEventListener('click', () => { if (!reducedMotion()) runDemoAnimation(); });
+  replayBtn.addEventListener('click', () => { if (!reducedMotion() && !narrow.matches) runDemoAnimation(); });
 
   // a chapter jumps the video to its start
   const video = document.getElementById('rv-video') as HTMLVideoElement;
@@ -567,6 +568,23 @@ import PlayableVideo from "./PlayableVideo.astro";
       padding: 22px 18px;
       max-width: 100% !important;
     }
+    /* the card is already finished here (see the script): nothing unfolds or fades in */
+    .rv, .rv-left, .rv-right, .rv-cols, .rv-anim-item { transition: none !important; }
+    .rv-replay-pill { display: none !important; }
+    /* just the demo: the card spans the screen edge to edge, so the video is as large as it can be, with its
+       chapters below; the conversation and the buttons stay on wider screens */
+    .rv {
+      width: 100vw;
+      max-width: none !important;
+      margin-left: calc(50% - 50vw);
+      border-radius: 0;
+      border-left: 0;
+      border-right: 0;
+      padding: 20px 12px 16px !important;
+    }
+    .rv::before { left: 12px; }
+    .rv-head { padding: 0 4px; }
+    .rv-right, .rv-actions { display: none !important; }
     .rv-cols {
       flex-direction: column-reverse;
       gap: 16px;

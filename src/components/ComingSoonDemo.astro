@@ -91,9 +91,12 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
   // Fit world size and scale to container
   function fit() {
     const w = root.clientWidth;
-    currentScale = Math.max(0.55, Math.min(0.85, w / W));
-    world.style.transform = `translateX(${Math.max(0, (w - W * currentScale) / 2)}px) scale(${currentScale})`;
-    root.style.height = H * currentScale + 'px';
+    // as wide as the container allows, never wider: on a phone the whole canvas shows, smaller
+    currentScale = Math.min(0.85, w / W);
+    // on a phone the cards start below the reset button, which would otherwise cover the top row
+    const top = w <= 640 ? 48 : 0;
+    world.style.transform = `translate(${Math.max(0, (w - W * currentScale) / 2)}px, ${top}px) scale(${currentScale})`;
+    root.style.height = H * currentScale + top + 'px';
   }
   new ResizeObserver(fit).observe(root);
   fit();

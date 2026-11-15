@@ -5,4 +5,4 @@ export const navLinks = [
   { href: "/demos/", label: "Demos" },
 ];
 export const githubUrl = "https://github.com/nickpalenchar/seismic";
-export const obeyaUrl = "https://github.com/sadilek/obeya";
+export const obeyaUrl = "https://obeya.si";
