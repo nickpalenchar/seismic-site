@@ -513,7 +513,8 @@ import PlayableVideo from "./PlayableVideo.astro";
 
   .rv-anim-item.show {
     opacity: 1;
-    max-height: 120px;
+    /* roomy enough for the longest bubble at its narrowest, so text never spills onto the next one */
+    max-height: 320px;
     overflow: visible;
     transform: translateY(0) scale(1);
   }
