@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "docs": "sh scripts/fetch-docs.sh",
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "sh scripts/fetch-docs.sh && astro build",
     "preview": "astro preview"
   },
   "dependencies": {

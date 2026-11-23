@@ -1,0 +1,59 @@
+# Builds the site and uploads it to the bucket pdb set up, then clears the CloudFront cache.
+# pdb itself does not run here (it installs only for nth-degree repos); infrastructure changes
+# still go through `pdb deploy` from a machine. The upload matches pdb's: no deletes, content
+# type from the file name, one /* invalidation.
+#
+# Runs on pushes to main, when seismic moves its docs-vlatest tag (repository_dispatch from
+# seismic's docs-publish workflow), and by hand.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [docs-updated]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.18.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Pulls the docs from seismic's docs-vlatest tag (scripts/fetch-docs.sh), then astro build.
+      - run: pnpm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-2
+          role-session-name: seismic-site-deploy
+
+      - name: Upload dist/
+        run: aws s3 sync dist "s3://${{ vars.SITE_BUCKET }}" --no-progress
+
+      - name: Invalidate CloudFront
+        run: >
+          aws cloudfront create-invalidation
+          --distribution-id "${{ vars.SITE_DISTRIBUTION_ID }}"
+          --paths "/*"
+          --query Invalidation.Id --output text

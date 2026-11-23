@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Role the seismic-site GitHub Actions deploy assumes (OIDC) to upload dist/ to the site
+  bucket and invalidate its CloudFront distribution. pdb created the bucket and distribution
+  and still owns them; this role can only change their contents. Deploy with `just deploy-role`.
+
+Parameters:
+  GitHubSubject:
+    Type: String
+    Description: >
+      OIDC subject prefix for the repo, from
+      `gh api repos/nickpalenchar/seismic-site/actions/oidc/customization/sub`.
+  BucketName:
+    Type: String
+  DistributionId:
+    Type: String
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: true only when the account has no token.actions.githubusercontent.com provider yet.
+
+Conditions:
+  MakeProvider: !Equals [!Ref CreateOidcProvider, "true"]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: MakeProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: seismic-site-github-deploy
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # Only runs on main: pushes, docs dispatches and manual runs all carry this ref.
+                token.actions.githubusercontent.com:sub: !Sub ${GitHubSubject}:ref:refs/heads/main
+      Policies:
+        - PolicyName: upload-and-invalidate
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:aws:s3:::${BucketName}
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:aws:s3:::${BucketName}/*
+              - Effect: Allow
+                Action: cloudfront:CreateInvalidation
+                Resource: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${DistributionId}
+
+Outputs:
+  RoleArn:
+    Value: !GetAtt DeployRole.Arn
