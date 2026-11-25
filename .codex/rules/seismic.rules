@@ -1,0 +1,16 @@
+# Generated from .claude/settings.json by the `allow-list.ts --codex` of the skill `seismic:settings`; edit that file, not this one.
+# A Codex rule is a word prefix: a Claude rule without a `*` (an exact command) allows arguments after it here.
+# Rules whose `*` stands inside a word have no form here; Seismic applies them itself to its Codex workers:
+
+prefix_rule(pattern=["pnpm","install"], decision="allow")
+prefix_rule(pattern=["pnpm","install","--frozen-lockfile"], decision="allow")
+prefix_rule(pattern=["pnpm","run","docs"], decision="allow")
+prefix_rule(pattern=["pnpm","run","dev"], decision="allow")
+prefix_rule(pattern=["pnpm","run","build"], decision="allow")
+prefix_rule(pattern=["pnpm","run","preview"], decision="allow")
+prefix_rule(pattern=["pnpm","exec","astro","dev"], decision="allow")
+prefix_rule(pattern=["pnpm","exec","astro","build"], decision="allow")
+prefix_rule(pattern=["pnpm","exec","astro","sync"], decision="allow")
+prefix_rule(pattern=["pnpm","exec","astro","--version"], decision="allow")
+prefix_rule(pattern=["just","docs"], decision="allow")
+prefix_rule(pattern=["cat",".astro/dev.json"], decision="allow")

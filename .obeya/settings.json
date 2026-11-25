@@ -1,8 +1,0 @@
-{
-  "setup": "bun install",
-  "checks": ["bun run build"],
-  "app": {
-    "run": "A static Astro site (no backend, no database, no login). Start the dev server in your workspace with `bun run dev --background`: it returns at once and the server keeps running. It takes port 4321, or the next free one when another workspace holds it; its address is `url` in `.astro/dev.json` (also printed when it starts, and by `bunx astro dev status`). Logs: `bunx astro dev logs`. Pages reload by themselves after a change to `src/` or `public/`; after a change to `astro.config.mjs` or `package.json`, stop it and start it again. Pages: `/` (the pitch), `/install/`, `/docs/`, `/demos/`. The theme follows the system; the toggle in the header switches light and dark. Stop it with `bunx astro dev stop`, which stops only this workspace's server.",
-    "stop": "bunx astro dev stop"
-  }
-}

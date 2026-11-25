@@ -1,9 +1,9 @@
 ---
 // "More features coming soon" as an interactive canvas: one card per feature, with dependencies.
-// Reproduces Obeya's cutting-edge smooth transitions on a grid with cards and arrows:
+// Reproduces Seismic's cutting-edge smooth transitions on a grid with cards and arrows:
 // - Cards can be freely dragged on the dotted grid, smoothly recalculating cubic Bézier arrows in real-time.
 // - Flowing energy pulses travel along dependency curves from prerequisite to dependent tasks.
-// - Connection handles (Obeya connection dots) appear on card edges.
+// - Connection handles (Seismic's connection dots) appear on card edges.
 // - Hovering or clicking a card highlights its full dependency chain (amber for "comes first", purple for "waits for it").
 const cards = [
   { id: 'cloud', x: 40, y: 60, t: 'Cloud support', d: 'Run workspaces and agents in the cloud.' },
@@ -107,7 +107,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
     return { x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight };
   };
 
-  // Obeya's link curve (from obeya src/ui/parts.tsx linkCurve):
+  // Seismic's link curve (from seismic src/ui/parts.tsx linkCurve):
   // Leaves facing edges square into the cards, square into the arrow head
   function path(a: B, b: B) {
     const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
@@ -162,7 +162,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
     }
   }
 
-  // Obeya depsOf dependency tree calculator
+  // Seismic's depsOf dependency tree calculator
   function depsOf(id: string) {
     const behind = (x: string) => edges.filter(([, to]) => to === x).map(([from]) => from);
     const ahead = (x: string) => edges.filter(([from]) => from === x).map(([, to]) => to);
@@ -533,7 +533,7 @@ const waits = [['cloud', 'multi'], ['multi', 'bench'], ['opencode', 'bench'], ['
     font-weight: 500;
   }
 
-  /* Connection handles on 4 sides (Obeya style) */
+  /* Connection handles on 4 sides (Seismic style) */
   .cs-handles {
     position: absolute;
     inset: -6px;

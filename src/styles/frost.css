@@ -1,4 +1,4 @@
-/* The Seismic look, "frost" (obeya src/ui/frost.css): frosted glass over a cool gradient board, ice-blue light, smoked glass dark.
+/* The Seismic look, "frost" (seismic src/ui/frost.css): frosted glass over a cool gradient board, ice-blue light, smoked glass dark.
    Fonts and colour variables only, shared by the site (global.css) and the docs (docs.css). */
 @font-face { font-family: Inter; font-style: normal; font-weight: 100 900; font-display: swap; src: url(/fonts/inter-latin-wght-normal.woff2) format("woff2"); }
 @font-face { font-family: "Bakbak One"; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/bakbak-one-latin-400-normal.woff2) format("woff2"); }

@@ -1,0 +1,10 @@
+{
+  "setup": "pnpm install && pnpm run docs",
+  "checks": [
+    "pnpm run build"
+  ],
+  "app": {
+    "run": "A static Astro site (no backend, no database, no login). Start the dev server in your workspace with `pnpm exec astro dev --background`: it returns at once and the server keeps running. It takes port 4321, or the next free one when another workspace holds it; its address is `url` in `.astro/dev.json` (also printed when it starts, and by `pnpm exec astro dev status`). Logs: `pnpm exec astro dev logs`. Pages reload by themselves after a change to `src/` or `public/`; after a change to `astro.config.mjs` or `package.json`, stop it and start it again. The docs under `/docs/` are a copy pulled from the seismic repository (`pnpm run docs` refreshes it; their source is seismic's `docs/site/`, not this repository). Pages: `/` (the pitch), `/install/`, `/docs/`, `/demos/`. The theme follows the system; the toggle in the header switches light and dark. Stop it with `pnpm exec astro dev stop`, which stops only this workspace's server.",
+    "stop": "pnpm exec astro dev stop"
+  }
+}
