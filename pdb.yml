@@ -7,7 +7,7 @@ defaults:
 
 components:
   - site:static:
-      build_script: bun run build
+      build_script: pnpm run build
       entrypoint: dist
       # DNS (and ACM validation) for seismic.im is handled by the Cloudflare extension.
       ^cloudflare:domain: seismic.im
